@@ -25,6 +25,12 @@ export function Header() {
           <Link href="/monitor" className="text-sm text-muted-foreground hover:text-foreground">
             爆款监控
           </Link>
+          <Link href="/analytics" className="text-sm text-muted-foreground hover:text-foreground">
+            数据分析
+          </Link>
+          <Link href="/calendar" className="text-sm text-muted-foreground hover:text-foreground">
+            内容日历
+          </Link>
           {isSignedIn ? (
             <UserButton
               appearance={{

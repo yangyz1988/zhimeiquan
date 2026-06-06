@@ -2,7 +2,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 
-from routers import content, titles, score, rules, ab_test, analytics, video
+from routers import (
+    content,
+    titles,
+    score,
+    rules,
+    ab_test,
+    analytics,
+    video,
+    calendar,
+    image,
+    templates,
+    agent,
+    team,
+)
 from services.error_handler import ServiceError
 from services.logging import logger
 from middleware import setup_middleware
@@ -10,7 +23,7 @@ from middleware import setup_middleware
 app = FastAPI(
     title="智媒圈 API",
     description="AI自媒体内容工厂 - 后端服务",
-    version="0.4.0",
+    version="0.5.0",
 )
 
 app.add_middleware(
@@ -24,7 +37,6 @@ app.add_middleware(
 setup_middleware(app)
 
 
-# 全局异常处理
 @app.exception_handler(ServiceError)
 async def service_error_handler(request, exc: ServiceError):
     logger.error("服务错误", code=exc.code, message=exc.message, path=request.url.path)
@@ -52,16 +64,20 @@ app.include_router(rules.router, prefix="/api/v1/monitor", tags=["爆款监控"]
 app.include_router(video.router, prefix="/api/v1/video", tags=["视频生成"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["数据闭环"])
 app.include_router(ab_test.router, prefix="/api/v1/ab-test", tags=["A/B测试"])
+app.include_router(calendar.router, prefix="/api/v1/calendar", tags=["内容调度"])
+app.include_router(image.router, prefix="/api/v1/image", tags=["图像生成"])
+app.include_router(templates.router, prefix="/api/v1/templates", tags=["模板系统"])
+app.include_router(agent.router, prefix="/api/v1/agent", tags=["自主Agent"])
+app.include_router(team.router, prefix="/api/v1/team", tags=["团队协作"])
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "0.4.0"}
+    return {"status": "ok", "version": "0.5.0"}
 
 
 @app.get("/metrics")
 async def metrics():
-    """Prometheus 指标"""
     return {
         "requests_total": 0,
         "errors_total": 0,
