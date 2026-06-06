@@ -1,0 +1,8 @@
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true
+  sharp: true
+minimumReleaseAgeExclude:
+  - '@radix-ui/react-compose-refs@1.1.3'
+  - '@radix-ui/react-slot@1.2.5'
