@@ -12,7 +12,7 @@ import pytest
 
 from services.content_loader import (
     MAX_INJECT_CHARS,
-    clear_cache,
+    clear_file_cache,
     get_methodology,
     get_persona,
     get_template,
@@ -23,9 +23,9 @@ from services.content_loader import (
 
 @pytest.fixture(autouse=True)
 def _clear_cache_between_tests():
-    clear_cache()
+    clear_file_cache()
     yield
-    clear_cache()
+    clear_file_cache()
 
 
 def test_get_methodology_hook_returns_content():
@@ -58,6 +58,20 @@ def test_get_methodology_unknown_dimension_returns_empty():
         ("douyin", "抖音"),
         ("bili", "B 站"),
         ("yt", "YouTube"),
+        ("快手", "快手"),
+        ("视频号", "视频号"),
+        ("微博", "微博"),
+        ("知乎", "知乎"),
+        ("头条", "头条"),
+        ("Instagram", "Instagram"),
+        ("Twitter", "X"),
+        ("kuaishou", "快手"),
+        ("weibo", "微博"),
+        ("zhihu", "知乎"),
+        ("toutiao", "今日头条"),
+        ("instagram", "Instagram"),
+        ("twitter", "X"),
+        ("x.com", "X"),
     ],
 )
 def test_get_template_aliases(platform, key_in_file):
@@ -105,7 +119,7 @@ def test_cache_invalidates_on_file_modify(tmp_path: Path, monkeypatch):
     target.write_text("短内容 v1", encoding="utf-8")
 
     monkeypatch.setattr(content_loader, "CONTENT_DIR", tmp_path)
-    content_loader.clear_cache()
+    content_loader.clear_file_cache()
 
     doc1 = content_loader._read(target)
     assert doc1 == "短内容 v1"
@@ -118,10 +132,18 @@ def test_cache_invalidates_on_file_modify(tmp_path: Path, monkeypatch):
 
 def test_list_supported_platforms_includes_chinese_names():
     platforms = list_supported_platforms()
-    assert "抖音" in platforms
-    assert "小红书" in platforms
-    assert "B站" in platforms
-    assert "公众号" in platforms
+    expected = {
+        "抖音",
+        "小红书",
+        "B站",
+        "公众号",
+        "快手",
+        "视频号",
+        "微博",
+        "知乎",
+        "头条",
+    }
+    assert expected.issubset(set(platforms)), f"缺失: {expected - set(platforms)}"
     for p in platforms:
         assert any("\u4e00" <= c <= "\u9fff" for c in p), f"{p} 应含中文"
 
@@ -141,12 +163,12 @@ def test_content_dir_override_via_setattr(tmp_path: Path):
     original = content_loader.CONTENT_DIR
     try:
         content_loader.CONTENT_DIR = tmp_path
-        content_loader.clear_cache()
+        content_loader.clear_file_cache()
         doc = content_loader.get_methodology("hook")
         assert doc == "热加载测试内容 V1"
     finally:
         content_loader.CONTENT_DIR = original
-        content_loader.clear_cache()
+        content_loader.clear_file_cache()
 
 
 def test_content_dir_env_var_at_import_time(tmp_path: Path, monkeypatch):

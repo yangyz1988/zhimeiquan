@@ -62,6 +62,30 @@ PLATFORM_ALIASES: dict[str, str] = {
     "TikTok": "tiktok",
     "tiktok": "tiktok",
     "抖音国际版": "tiktok",
+    "快手": "kuaishou",
+    "kuaishou": "kuaishou",
+    "ks": "kuaishou",
+    "视频号": "shipinhao",
+    "shipinhao": "shipinhao",
+    "微信视频号": "shipinhao",
+    "wechat-channels": "shipinhao",
+    "微博": "weibo",
+    "weibo": "weibo",
+    "新浪微博": "weibo",
+    "知乎": "zhihu",
+    "zhihu": "zhihu",
+    "头条": "toutiao",
+    "toutiao": "toutiao",
+    "今日头条": "toutiao",
+    "Instagram": "instagram",
+    "instagram": "instagram",
+    "ig": "instagram",
+    "ins": "instagram",
+    "X": "twitter",
+    "Twitter": "twitter",
+    "twitter": "twitter",
+    "推特": "twitter",
+    "x.com": "twitter",
 }
 
 PERSONA_ALIASES: dict[str, str] = {
@@ -146,6 +170,6 @@ def list_supported_personas() -> list[str]:
     )
 
 
-def clear_cache() -> None:
-    """清空文件缓存（用于热更新/测试）"""
+def clear_file_cache() -> None:
+    """清空文件读取缓存（用于热更新/测试）"""
     _read_with_mtime.cache_clear()
