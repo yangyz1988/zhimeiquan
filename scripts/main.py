@@ -15,6 +15,7 @@ from routers import (
     templates,
     agent,
     team,
+    model_router,
 )
 from services.error_handler import ServiceError
 from services.logging import logger
@@ -69,6 +70,7 @@ app.include_router(image.router, prefix="/api/v1/image", tags=["图像生成"])
 app.include_router(templates.router, prefix="/api/v1/templates", tags=["模板系统"])
 app.include_router(agent.router, prefix="/api/v1/agent", tags=["自主Agent"])
 app.include_router(team.router, prefix="/api/v1/team", tags=["团队协作"])
+app.include_router(model_router.router, prefix="/api/v1/router", tags=["模型路由"])
 
 
 @app.get("/health")

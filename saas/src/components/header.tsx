@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAuth, UserButton, SignInButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Zap } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function Header() {
   const { isSignedIn } = useAuth();
@@ -28,9 +29,13 @@ export function Header() {
           <Link href="/analytics" className="text-sm text-muted-foreground hover:text-foreground">
             数据分析
           </Link>
+          <Link href="/router" className="text-sm text-muted-foreground hover:text-foreground">
+            模型路由
+          </Link>
           <Link href="/calendar" className="text-sm text-muted-foreground hover:text-foreground">
             内容日历
           </Link>
+          <ThemeToggle />
           {isSignedIn ? (
             <UserButton
               appearance={{

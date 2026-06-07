@@ -1,5 +1,7 @@
 import json
 
+from .content_loader import get_methodology, get_persona, get_template
+
 SYSTEM_BASE = "你是智媒圈AI助手，专业的自媒体内容创作专家。请用中文回复。"
 
 
@@ -21,6 +23,18 @@ class Prompts:
 - 公众号：深度长文，逻辑清晰
 - YouTube：国际化视角，SEO友好
 - TikTok：全球化，趋势敏感"""
+
+        template = get_template(platform)
+        if template:
+            system += f"\n\n## {platform} 平台爆款模板（来自知识库）\n{template}"
+
+        persona_doc = get_persona(persona)
+        if persona_doc:
+            system += f"\n\n## {persona} 人设指南（来自知识库）\n{persona_doc}"
+
+        hook_doc = get_methodology("hook")
+        if hook_doc:
+            system += f"\n\n## 钩子力方法论（Fire Score 维度 1 · 权重 25%）\n{hook_doc}"
 
         if rules:
             rules_text = json.dumps(rules, ensure_ascii=False, indent=2)
@@ -53,6 +67,14 @@ class Prompts:
 - 有悬念或反常识
 - 有情绪共鸣
 - 符合平台算法偏好"""
+
+        template = get_template(platform)
+        if template:
+            system += f"\n\n## {platform} 平台爆款模板（来自知识库）\n{template}"
+
+        hook_doc = get_methodology("hook")
+        if hook_doc:
+            system += f"\n\n## 钩子力方法论（Fire Score 维度 1 · 权重 25%）\n{hook_doc}"
 
         if rules:
             rules_text = json.dumps(rules, ensure_ascii=False, indent=2)
@@ -91,6 +113,11 @@ class Prompts:
 - Lv3 高爆：70-79分
 - Lv4 普爆：60-69分
 - Lv5 基础：60分以下"""
+
+        for dim in ("hook", "trust", "retention", "conversion", "emotion"):
+            doc = get_methodology(dim)
+            if doc:
+                system += f"\n\n## Fire Score · {dim} 维度评分标准（来自知识库）\n{doc}"
 
         if rules:
             rules_text = json.dumps(rules, ensure_ascii=False, indent=2)

@@ -4,6 +4,7 @@ import "./globals.css";
 import { ClerkProvider } from "@/components/providers";
 import { Header } from "@/components/header";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { Toaster } from "@/components/toaster";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -54,6 +55,7 @@ export default function RootLayout({
           <ErrorBoundary>
             <Header />
             <main>{children}</main>
+            <Toaster />
           </ErrorBoundary>
         </body>
       </html>
