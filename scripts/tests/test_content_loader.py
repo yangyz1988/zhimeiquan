@@ -123,7 +123,7 @@ def test_list_supported_platforms_includes_chinese_names():
     assert "B站" in platforms
     assert "公众号" in platforms
     for p in platforms:
-        assert any("\u4e00" <= c <= "\u9fff" for c in p)
+        assert any("\u4e00" <= c <= "\u9fff" for c in p), f"{p} 应含中文"
 
 
 def test_list_supported_personas_includes_chinese_names():
@@ -131,15 +131,27 @@ def test_list_supported_personas_includes_chinese_names():
     assert {"学长型", "学姐型", "专家型"}.issubset(set(personas))
 
 
-def test_content_dir_env_override(tmp_path: Path, monkeypatch):
+def test_content_dir_override_via_setattr(tmp_path: Path):
     from services import content_loader
 
     fake = tmp_path / "methodology"
     fake.mkdir()
-    (fake / "01-hook-power.md").write_text("环境变量覆盖的测试内容", encoding="utf-8")
+    (fake / "01-hook-power.md").write_text("热加载测试内容 V1", encoding="utf-8")
 
-    monkeypatch.setenv("ZHIMEIQUAN_CONTENT_DIR", str(tmp_path))
-    content_loader.clear_cache()
+    original = content_loader.CONTENT_DIR
+    try:
+        content_loader.CONTENT_DIR = tmp_path
+        content_loader.clear_cache()
+        doc = content_loader.get_methodology("hook")
+        assert doc == "热加载测试内容 V1"
+    finally:
+        content_loader.CONTENT_DIR = original
+        content_loader.clear_cache()
 
-    doc = content_loader.get_methodology("hook")
-    assert doc == "环境变量覆盖的测试内容"
+
+def test_content_dir_env_var_at_import_time(tmp_path: Path, monkeypatch):
+    """模块级 CONTENT_DIR 在 import 时锁定环境变量，可通过 setattr 覆盖"""
+    from services import content_loader
+
+    assert content_loader.CONTENT_DIR.exists()
+    assert content_loader.CONTENT_DIR.name == "content"
