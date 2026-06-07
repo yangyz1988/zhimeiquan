@@ -14,11 +14,24 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-CONTENT_DIR = Path(
-    os.environ.get(
-        "ZHIMEIQUAN_CONTENT_DIR", Path(__file__).resolve().parents[2] / "content"
+
+def _get_content_dir() -> Path:
+    """运行时获取内容目录，支持环境变量动态覆盖"""
+    return Path(
+        os.environ.get(
+            "ZHIMEIQUAN_CONTENT_DIR",
+            str(Path(__file__).resolve().parents[2] / "content"),
+        )
     )
-)
+
+
+# 向后兼容：允许通过 monkeypatch 直接修改 CONTENT_DIR
+def _content_dir_default() -> Path:
+    return _get_content_dir()
+
+
+CONTENT_DIR = _content_dir_default()  # type: ignore[misc]
+
 
 MAX_INJECT_CHARS = 800
 
@@ -69,14 +82,31 @@ def _truncate(text: str, max_chars: int = MAX_INJECT_CHARS) -> str:
 
 
 @lru_cache(maxsize=64)
-def _read_with_mtime(path_str: str, mtime: float) -> str:
+def _read_with_mtime(path_str: str, mtime_ns: int) -> str:
     return Path(path_str).read_text(encoding="utf-8")
 
 
 def _read(path: Path) -> str:
     if not path.exists() or not path.is_file():
         return ""
-    return _read_with_mtime(str(path), path.stat().st_mtime)
+    # 使用纳秒级 mtime 以避免快速连续写入时缓存不失效
+    stat = path.stat()
+    return _read_with_mtime(str(path), stat.st_mtime_ns)
+
+
+def _resolve_dir() -> Path:
+    """解析实际的内容目录（优先 env var，其次 CONTENT_DIR）"""
+    env_dir = os.environ.get("ZHIMEIQUAN_CONTENT_DIR")
+    if env_dir:
+        return Path(env_dir)
+    if isinstance(CONTENT_DIR, Path):
+        return CONTENT_DIR
+    return _get_content_dir()
+
+
+def clear_cache() -> None:
+    """清空文件读取缓存（环境变量或文件变更后调用）"""
+    _read_with_mtime.cache_clear()
 
 
 def get_methodology(dimension: str) -> str:
@@ -84,7 +114,7 @@ def get_methodology(dimension: str) -> str:
     fname = METHODOLOGY_FILES.get(dimension)
     if not fname:
         return ""
-    return _truncate(_read(CONTENT_DIR / "methodology" / fname))
+    return _truncate(_read(_resolve_dir() / "methodology" / fname))
 
 
 def get_template(platform: str) -> str:
@@ -92,7 +122,7 @@ def get_template(platform: str) -> str:
     key = PLATFORM_ALIASES.get(platform, "")
     if not key:
         return ""
-    return _truncate(_read(CONTENT_DIR / "templates" / f"{key}-template.md"))
+    return _truncate(_read(_resolve_dir() / "templates" / f"{key}-template.md"))
 
 
 def get_persona(persona: str) -> str:
@@ -100,7 +130,7 @@ def get_persona(persona: str) -> str:
     key = PERSONA_ALIASES.get(persona, "")
     if not key:
         return ""
-    return _truncate(_read(CONTENT_DIR / "experts" / f"{key}-persona.md"))
+    return _truncate(_read(_resolve_dir() / "experts" / f"{key}-persona.md"))
 
 
 def list_supported_platforms() -> list[str]:

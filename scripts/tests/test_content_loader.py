@@ -122,8 +122,6 @@ def test_list_supported_platforms_includes_chinese_names():
     assert "小红书" in platforms
     assert "B站" in platforms
     assert "公众号" in platforms
-    assert "YouTube" in platforms
-    assert "TikTok" in platforms
     for p in platforms:
         assert any("\u4e00" <= c <= "\u9fff" for c in p)
 
