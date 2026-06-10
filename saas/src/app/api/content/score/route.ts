@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const API_URL = process.env.API_URL || "http://localhost:8000";
+import { requireAuth } from "@/lib/auth";
+import { apiFetch } from "@/lib/api";
 
 export async function POST(request: NextRequest) {
+  const authResult = await requireAuth();
+  if ("status" in authResult) return authResult;
+  const { userId } = authResult;
+
   const body = await request.json();
 
   try {
-    const res = await fetch(`${API_URL}/api/v1/content/score`, {
+    const { ok, status, data } = await apiFetch("/api/v1/content/score", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body,
     });
-
-    if (!res.ok) {
-      return NextResponse.json({ error: "评分失败" }, { status: res.status });
+    if (!ok) {
+      return NextResponse.json({ error: "评分失败" }, { status });
     }
-
-    const data = await res.json();
     return NextResponse.json(data);
   } catch {
     return NextResponse.json({ error: "API 服务未启动" }, { status: 503 });

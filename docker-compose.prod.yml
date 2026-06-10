@@ -8,11 +8,12 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=postgresql://zhimeiquan:zhimeiquan@postgres:5432/zhimeiquan
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-zhimeiquan}:${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-zhimeiquan}
       - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
       - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
       - API_URL=http://api:8000
+      - API_SECRET=${API_SECRET}
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,6 +40,7 @@ services:
       - ERNIE_API_KEY=${ERNIE_API_KEY:-}
       - HUNYUAN_API_KEY=${HUNYUAN_API_KEY:-}
       - REDIS_URL=redis://redis:6379
+      - API_SECRET=${API_SECRET}
       - LOG_FORMAT=json
       - LOG_LEVEL=info
     depends_on:
@@ -56,9 +58,9 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      - POSTGRES_USER=zhimeiquan
-      - POSTGRES_PASSWORD=zhimeiquan
-      - POSTGRES_DB=zhimeiquan
+      - POSTGRES_USER=${POSTGRES_USER:-zhimeiquan}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-zhimeiquan}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./deploy/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql

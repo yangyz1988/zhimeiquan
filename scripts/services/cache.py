@@ -158,20 +158,23 @@ class RateLimiter:
         return True, limit - count - 1
 
 
+_default_cache = CacheService()
+_default_limiter = RateLimiter()
+
+
 def cache_result(prefix: str, ttl: int = 3600):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            cache = CacheService()
-            key = cache._make_key(
+            key = _default_cache._make_key(
                 f"{prefix}:{func.__name__}", {"args": str(args), "kwargs": str(kwargs)}
             )
-            cached = await cache.get(key)
+            cached = await _default_cache.get(key)
             if cached is not None:
                 return cached
             result = await func(*args, **kwargs)
             if result is not None:
-                await cache.set(key, result, ttl=ttl)
+                await _default_cache.set(key, result, ttl=ttl)
             return result
 
         return wrapper
@@ -183,9 +186,8 @@ def rate_limit(limit: int = 60, window: int = 60, key_func=None):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            limiter = RateLimiter()
             key = key_func(*args, **kwargs) if key_func else "default"
-            allowed, remaining = await limiter.is_allowed(key, limit, window)
+            allowed, remaining = await _default_limiter.is_allowed(key, limit, window)
             if not allowed:
                 from fastapi import HTTPException
 

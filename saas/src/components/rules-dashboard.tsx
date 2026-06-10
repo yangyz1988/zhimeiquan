@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, TrendingUp, Clock, AlertCircle, CheckCircle } from "lucide-react";
+import { toast } from "@/components/toaster";
 
 interface Rule {
   rule: string;
@@ -72,6 +73,7 @@ export function RulesDashboard() {
       setStatus(statusData);
     } catch (error) {
       console.error("获取规则失败:", error);
+      toast("获取规则失败", "error");
     } finally {
       setLoading(false);
     }
@@ -84,6 +86,7 @@ export function RulesDashboard() {
       await fetchRules();
     } catch (error) {
       console.error("刷新失败:", error);
+      toast("刷新失败，请稍后重试", "error");
     } finally {
       setLoading(false);
     }

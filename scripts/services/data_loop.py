@@ -14,7 +14,12 @@ class DataTracker:
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
     def record_publish(
-        self, project_id: str, platform: str, title: str, content_id: str
+        self,
+        project_id: str,
+        platform: str,
+        title: str,
+        content_id: str,
+        fire_score: float | None = None,
     ) -> dict:
         """记录发布事件"""
         record = {
@@ -32,7 +37,7 @@ class DataTracker:
                 "follows": 0,
                 "watch_time": 0,
             },
-            "fire_score": None,
+            "fire_score": fire_score,
             "updated_at": datetime.now().isoformat(),
         }
 
@@ -100,6 +105,18 @@ class DataTracker:
             platform_data[platform]["likes"] += record["metrics"]["likes"]
 
         return platform_data
+
+    def get_avg_fire_score(self, project_id: str | None = None) -> float | None:
+        """获取平均 Fire Score"""
+        scores = []
+        pattern = f"{project_id}_*.json" if project_id else "*.json"
+        for f in self.data_dir.glob(pattern):
+            with open(f, "r", encoding="utf-8") as file:
+                record = json.load(file)
+            score = record.get("fire_score")
+            if score is not None:
+                scores.append(score)
+        return round(sum(scores) / len(scores), 1) if scores else None
 
 
 class ABTester:

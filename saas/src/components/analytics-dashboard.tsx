@@ -37,31 +37,14 @@ export function AnalyticsDashboard() {
 
   const fetchData = async () => {
     try {
-      // 模拟数据 - 实际从 API 获取
-      const mockData: AnalyticsData = {
-        total_content: 12,
-        total_views: 156000,
-        total_likes: 8200,
-        total_comments: 1100,
-        total_shares: 380,
-        avg_engagement: 6.1,
-        content_list: [
-          { title: "AI时代普通人的机会", platform: "抖音", metrics: { views: 45000, likes: 2300, comments: 320, shares: 110 } },
-          { title: "3个底层逻辑", platform: "小红书", metrics: { views: 32000, likes: 1800, comments: 250, shares: 90 } },
-          { title: "自媒体赚钱真相", platform: "B站", metrics: { views: 28000, likes: 1500, comments: 180, shares: 70 } },
-          { title: "AI工具推荐", platform: "公众号", metrics: { views: 18000, likes: 800, comments: 120, shares: 50 } },
-          { title: "效率翻倍", platform: "抖音", metrics: { views: 33000, likes: 1800, comments: 230, shares: 60 } },
-        ],
-      };
-      setData(mockData);
-      
-      const mockPlatforms: Record<string, PlatformStat> = {
-        "抖音": { count: 5, views: 78000, likes: 4100 },
-        "小红书": { count: 3, views: 32000, likes: 1800 },
-        "B站": { count: 2, views: 28000, likes: 1500 },
-        "公众号": { count: 2, views: 18000, likes: 800 },
-      };
-      setPlatforms(mockPlatforms);
+      const [analyticsRes, platformsRes] = await Promise.all([
+        fetch("/api/analytics/project/default"),
+        fetch("/api/analytics"),
+      ]);
+      const analyticsData = await analyticsRes.json();
+      const platformsData = await platformsRes.json();
+      setData(analyticsData);
+      setPlatforms(platformsData.platforms || {});
     } catch (error) {
       console.error(error);
     } finally {

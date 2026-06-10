@@ -34,7 +34,7 @@ async def generate_image(req: ImageRequest):
         )
         return {"images": result}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="图像生成失败，请稍后重试")
 
 
 @router.post("/cover")
@@ -48,4 +48,4 @@ async def generate_cover(req: CoverRequest):
         )
         return {"cover": cover_path}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="封面生成失败，请稍后重试")

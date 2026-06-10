@@ -47,4 +47,4 @@ async def generate_titles(req: TitleRequest):
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="AI 返回格式错误")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="标题生成失败，请稍后重试")

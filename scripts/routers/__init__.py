@@ -14,4 +14,5 @@ from . import (
     agent,
     team,
     model_router,
+    insights,
 )

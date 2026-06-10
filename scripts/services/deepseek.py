@@ -11,10 +11,10 @@ from services.logging import logger
 
 class DeepSeekClient:
     def __init__(
-        self, api_key: str | None = None, base_url: str = "https://api.deepseek.com"
+        self, api_key: str | None = None, base_url: str | None = None,
     ):
         self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY", "")
-        self.base_url = base_url
+        self.base_url = base_url or os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
         self.model = "deepseek-chat"
         self.cache = CacheService()
 

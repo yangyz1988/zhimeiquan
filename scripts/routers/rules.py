@@ -50,7 +50,7 @@ async def refresh_rules():
         result = await scheduler.update_all_rules()
         return {"status": "ok", "platforms": list(result.keys())}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="规则刷新失败，请稍后重试")
 
 
 @router.get("/rules/status")

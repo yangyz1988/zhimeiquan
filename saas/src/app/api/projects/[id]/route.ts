@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if ("status" in authResult) return authResult;
+  const { userId } = authResult;
 
   const { id } = await params;
   const project = await prisma.project.findFirst({
@@ -28,17 +27,17 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if ("status" in authResult) return authResult;
+  const { userId } = authResult;
 
   const { id } = await params;
   const body = await request.json();
+  const { name, topic, platform, persona, duration } = body;
 
   const project = await prisma.project.updateMany({
     where: { id, userId },
-    data: body,
+    data: { name, topic, platform, persona, duration },
   });
 
   return NextResponse.json(project);
@@ -48,10 +47,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if ("status" in authResult) return authResult;
+  const { userId } = authResult;
 
   const { id } = await params;
   await prisma.project.deleteMany({

@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if ("status" in authResult) return authResult;
+  const { userId } = authResult;
 
   const projects = await prisma.project.findMany({
     where: { userId },
@@ -18,10 +17,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if ("status" in authResult) return authResult;
+  const { userId } = authResult;
 
   const body = await request.json();
   const { name, topic, platform, persona, duration } = body;

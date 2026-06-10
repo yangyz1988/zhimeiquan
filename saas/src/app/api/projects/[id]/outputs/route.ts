@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
@@ -7,10 +7,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if ("status" in authResult) return authResult;
+  const { userId } = authResult;
 
   const { id } = await params;
   const body = await request.json();
@@ -42,12 +41,19 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "未登录" }, { status: 401 });
-  }
+  const authResult = await requireAuth();
+  if ("status" in authResult) return authResult;
+  const { userId } = authResult;
 
   const { id } = await params;
+
+  const project = await prisma.project.findFirst({
+    where: { id, userId },
+  });
+  if (!project) {
+    return NextResponse.json({ error: "项目不存在" }, { status: 404 });
+  }
+
   const outputs = await prisma.contentOutput.findMany({
     where: { projectId: id },
     orderBy: { createdAt: "desc" },

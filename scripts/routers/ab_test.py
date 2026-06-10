@@ -1,5 +1,8 @@
 """A/B 测试管理 API"""
 
+import json
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -18,6 +21,17 @@ class CreateTestRequest(BaseModel):
 class UpdateVariantRequest(BaseModel):
     variant_id: str
     metrics: dict
+
+
+@router.get("/list")
+async def list_tests():
+    """列出所有 A/B 测试"""
+    tests_dir = Path(tester.data_dir)
+    tests = []
+    for f in sorted(tests_dir.glob("*.json")):
+        with open(f, "r", encoding="utf-8") as file:
+            tests.append(json.load(file))
+    return {"tests": tests, "total": len(tests)}
 
 
 @router.post("/create")

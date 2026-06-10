@@ -1,6 +1,7 @@
 """多模型 LLM 客户端 - 统一接口"""
 
 import os
+import time
 from abc import ABC, abstractmethod
 
 import httpx
@@ -26,7 +27,7 @@ class DeepSeekLLM(BaseLLM):
     def __init__(self):
         super().__init__(
             api_key=os.getenv("DEEPSEEK_API_KEY", ""),
-            base_url="https://api.deepseek.com",
+            base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
             model="deepseek-chat",
         )
 
@@ -91,14 +92,15 @@ class ERNIELLM(BaseLLM):
         self.api_key = os.getenv("ERNIE_API_KEY", "")
         self.secret_key = os.getenv("ERNIE_SECRET_KEY", "")
         self.model = "ernie-speed-128k"
-        self._access_token = None
+        self._access_token: str | None = None
+        self._token_expires_at: float = 0
 
     async def _get_access_token(self) -> str:
-        if self._access_token:
+        if self._access_token and time.time() < self._token_expires_at:
             return self._access_token
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
-                f"https://aip.baidubce.com/oauth/2.0/token",
+                "https://aip.baidubce.com/oauth/2.0/token",
                 params={
                     "grant_type": "client_credentials",
                     "client_id": self.api_key,
@@ -107,6 +109,7 @@ class ERNIELLM(BaseLLM):
             )
             resp.raise_for_status()
             self._access_token = resp.json()["access_token"]
+            self._token_expires_at = time.time() + 25 * 24 * 3600
             return self._access_token
 
     async def chat(

@@ -2,7 +2,7 @@
 
 import json
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
@@ -72,8 +72,8 @@ class TeamService:
             "role": role,
             "token": token,
             "status": "pending",
-            "created_at": datetime.now().isoformat(),
-            "expires_at": datetime.now().isoformat(),  # 实际应该是 +7 天
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
         }
 
         invitations = self._load_invitations()
@@ -91,6 +91,8 @@ class TeamService:
             return {"error": "邀请无效"}
         if invitation["status"] != "pending":
             return {"error": "邀请已被使用"}
+        if datetime.fromisoformat(invitation["expires_at"]) < datetime.now(timezone.utc):
+            return {"error": "邀请已过期"}
 
         # 添加成员到团队
         teams = self._load_teams()

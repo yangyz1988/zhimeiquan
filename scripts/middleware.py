@@ -52,5 +52,5 @@ def setup_middleware(app: FastAPI):
             )
             return JSONResponse(
                 status_code=500,
-                content={"detail": "内部服务器错误", "error": str(e)},
+                content={"detail": "内部服务器错误"},
             )

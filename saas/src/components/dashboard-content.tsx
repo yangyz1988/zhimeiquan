@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, FileText, BarChart3, Loader2, Trash2 } from "lucide-react";
+import { toast } from "@/components/toaster";
 
 interface Project {
   id: string;
@@ -35,10 +36,15 @@ export function DashboardContent() {
   const fetchProjects = async () => {
     try {
       const res = await fetch("/api/projects");
+      if (!res.ok) {
+        toast("加载项目失败", "error");
+        return;
+      }
       const data = await res.json();
       setProjects(data);
     } catch (error) {
       console.error(error);
+      toast("网络错误，请检查连接", "error");
     } finally {
       setLoading(false);
     }
@@ -60,6 +66,7 @@ export function DashboardContent() {
       router.push(`/generate?project=${data.id}`);
     } catch (error) {
       console.error(error);
+      toast("创建项目失败", "error");
     } finally {
       setCreating(false);
     }
@@ -70,8 +77,10 @@ export function DashboardContent() {
     try {
       await fetch(`/api/projects/${id}`, { method: "DELETE" });
       setProjects(projects.filter((p) => p.id !== id));
+      toast("项目已删除", "success");
     } catch (error) {
       console.error(error);
+      toast("删除失败", "error");
     }
   };
 

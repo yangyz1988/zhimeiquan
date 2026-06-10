@@ -14,6 +14,7 @@ class PublishRequest(BaseModel):
     platform: str
     title: str
     content_id: str
+    fire_score: float | None = None
 
 
 class MetricsRequest(BaseModel):
@@ -24,7 +25,11 @@ class MetricsRequest(BaseModel):
 async def record_publish(req: PublishRequest):
     """记录发布事件"""
     record = tracker.record_publish(
-        req.project_id, req.platform, req.title, req.content_id
+        req.project_id,
+        req.platform,
+        req.title,
+        req.content_id,
+        fire_score=req.fire_score,
     )
     return record
 
@@ -48,3 +53,10 @@ async def get_project_analytics(project_id: str):
 async def get_platform_summary():
     """获取平台汇总"""
     return tracker.get_platform_summary()
+
+
+@router.get("/fire-score/{project_id}")
+async def get_fire_score(project_id: str):
+    """获取项目平均 Fire Score"""
+    avg = tracker.get_avg_fire_score(project_id)
+    return {"project_id": project_id, "avg_fire_score": avg}

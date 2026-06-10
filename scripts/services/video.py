@@ -100,7 +100,7 @@ class VideoGenerator:
         try:
             font = ImageFont.truetype("msyh.ttc", 72)
             small_font = ImageFont.truetype("msyh.ttc", 36)
-        except:
+        except (OSError, IOError):
             font = ImageFont.load_default()
             small_font = font
 

@@ -105,6 +105,22 @@ class CircuitBreaker:
         self.last_failure_time = 0
         self.state = "closed"  # closed / open / half_open
 
+    async def acall(self, func: Callable, *args, **kwargs) -> Any:
+        """执行受保护的异步方法"""
+        if self.state == "open":
+            if time.time() - self.last_failure_time > self.recovery_time:
+                self.state = "half_open"
+            else:
+                raise ServiceError("服务暂时不可用", code="circuit_open", status=503)
+
+        try:
+            result = await func(*args, **kwargs)
+            self._on_success()
+            return result
+        except Exception as e:
+            self._on_failure()
+            raise
+
     def call(self, func: Callable, *args, **kwargs) -> Any:
         """执行受保护的方法"""
         if self.state == "open":
@@ -114,9 +130,7 @@ class CircuitBreaker:
                 raise ServiceError("服务暂时不可用", code="circuit_open", status=503)
 
         try:
-            result = (
-                func(*args, **kwargs) if not asyncio.iscoroutinefunction(func) else None
-            )
+            result = func(*args, **kwargs)
             self._on_success()
             return result
         except Exception as e:
