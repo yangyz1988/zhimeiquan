@@ -7,44 +7,614 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ---------------------------------------------------------------------------
+// 1. User - enhanced with plan, clerkId, avatar, and team/tenant awareness
+// ---------------------------------------------------------------------------
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  plan      String   @default("free")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String        @id @default(cuid())
+  clerkId      String?       @unique
+  email        String        @unique
+  name         String?
+  avatar       String?
+  plan         PlanTier      @default(FREE)
+  planExpires  DateTime?
+  credits      Int           @default(0)
+  isTeamAdmin  Boolean       @default(false)
+  settings     Json?
+  lastLoginAt  DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  projects Project[]
+  projects               Project[]
+  accounts               PlatformAccount[]
+  contentOutputs         ContentOutput[]
+  knowledgeArticles      KnowledgeArticle[]
+  contentVersions        ContentVersion[]
+  schedules              Schedule[]
+  agentSessions          AgentSession[]
+  abTests                AbTest[]
+  abTestParticipants     AbTestParticipant[]
+  teamMembers            TeamMember[]
+  webhooks               Webhook[]
+  integrations           Integration[]
+  notifications          Notification[]
+  auditLogs              AuditLog[]
+  usageMetrics           UsageMetric[]
+  insights               Insight[]
+  promptCacheEntries     PromptCacheEntry[]
+  agentRuns              AgentRun[]
 }
 
+enum PlanTier {
+  FREE
+  STARTER
+  PRO
+  TEAM
+  ENTERPRISE
+}
+
+// ---------------------------------------------------------------------------
+// 2. Project - content project owned by a user
+// ---------------------------------------------------------------------------
 model Project {
-  id        String   @id @default(cuid())
-  name      String
-  topic     String
-  platform  String
-  persona   String?
-  duration  Int?
-  status    String   @default("draft")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  topic       String
+  platforms   Json          // ["douyin", "xiaohongshu", ...]
+  persona     String?
+  tone        String?
+  targetAudience String?
+  duration    Int?
+  status      ProjectStatus @default(DRAFT)
+  config      Json?       // project-level generation config
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  userId String
-  user   User @relation(fields: [userId], references: [id])
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
 
-  outputs ContentOutput[]
+  outputs     ContentOutput[]
+  schedules   Schedule[]
 }
 
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+// ---------------------------------------------------------------------------
+// 3. ContentOutput - generated content with Fire Score and metadata
+// ---------------------------------------------------------------------------
 model ContentOutput {
-  id        String   @id @default(cuid())
-  title     String
-  body      String
-  script    String?
-  tags      String?
-  fireScore Json?
-  level     String?
-  createdAt DateTime @default(now())
+  id          String        @id @default(cuid())
+  title       String
+  body        String
+  script      String?
+  tags        Json?         // string[] of tags
+  fireScore   Json?         // { platform: { score, rationale, tips } }
+  level       String?       // content difficulty/reading level
+  platform    String?       // target platform for this output
+  contentType ContentOutputType @default(ARTICLE)
+  status      OutputStatus  @default(DRAFT)
+  metadata    Json?         // extra fields (word count, reading time, etc.)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id])
+  projectId   String
+  project     Project       @relation(fields: [projectId], references: [id])
+  versions    ContentVersion[]
+
+  @@index([projectId])
 }
+
+enum ContentOutputType {
+  ARTICLE
+  VIDEO_SCRIPT
+  SHORT_VIDEO
+  SOCIAL_POST
+  EMAIL
+}
+
+enum OutputStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+// ---------------------------------------------------------------------------
+// 4. PlatformAccount - connected social / content platform accounts
+// ---------------------------------------------------------------------------
+model PlatformAccount {
+  id          String   @id @default(cuid())
+  platform    Platform
+  platformId  String          // ID on the external platform
+  username    String?
+  displayName String?
+  avatar      String?
+  accessToken String?
+  refreshUrl  String?
+  metadata    Json?
+  isActive    Boolean  @default(true)
+  connectedAt DateTime @default(now())
+  lastSyncAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+
+  @@unique([userId, platform, platformId])
+}
+
+enum Platform {
+  DOUYIN        // 抖音
+  XIAOHONGSHU   // 小红书
+  BILIBILI      // B站
+  WECHAT_OFFICIAL // 公众号
+  KUAI_SHOU     // 快手
+  WEIBO         // 微博
+  ZHIHU         // 知乎
+  TODOU         // 头条
+  XI_GUA        // 西瓜视频
+  SHI_PIN_HAO   // 视频号
+  XIAN_YU       // 闲鱼
+  TIKTOK        // TikTok
+}
+
+// ---------------------------------------------------------------------------
+// 5. ContentTemplate - reusable content generation templates
+// ---------------------------------------------------------------------------
+model ContentTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  platform    String?
+  type        String          // article, video_script, social_post, ...
+  structure   Json!           // outline / section definitions
+  prompt      String          // template prompt for generation
+  variables   Json?           // list of placeholders like {{topic}}, {{audience}}
+  isPublic    Boolean  @default(false)
+  popularity  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id])
+
+  @@index([platform, type])
+}
+
+// ---------------------------------------------------------------------------
+// 6. KnowledgeArticle - knowledge base article with category, tags, version
+// ---------------------------------------------------------------------------
+model KnowledgeArticle {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  category    String
+  tags        Json?       // string[]
+  version     Int      @default(1)
+  isPublished Boolean  @default(false)
+  wordCount   Int?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id])
+
+  @@index([category])
+}
+
+// ---------------------------------------------------------------------------
+// 7. ContentVersion - version history per content output
+// ---------------------------------------------------------------------------
+model ContentVersion {
+  id          String   @id @default(cuid())
+  title       String
+  body        String
+  script      String?
+  summary     String    // change summary / commit message
+  versionNum  Int
+  createdAt   DateTime @default(now())
+
+  contentId   String
+  content     ContentOutput @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+
+  @@unique([contentId, versionNum])
+  @@index([contentId])
+}
+
+// ---------------------------------------------------------------------------
+// 8. Analytics - content performance metrics over time
+// ---------------------------------------------------------------------------
+model Analytics {
+  id          String   @id @default(cuid())
+  platform    Platform
+  entityId    String    // external platform post/video/article ID
+  views       Int      @default(0)
+  likes       Int      @default(0)
+  comments    Int      @default(0)
+  shares      Int      @default(0)
+  saves       Int      @default(0)
+  clicks      Int      @default(0)
+  watchTime   Int?     // seconds
+  revenue     Float?
+  collectedAt DateTime @default(now())
+
+  @@unique([platform, entityId, collectedAt])
+  @@index([entityId])
+  @@index([platform, collectedAt])
+}
+
+// ---------------------------------------------------------------------------
+// 9. Schedule - content scheduling with status tracking
+// ---------------------------------------------------------------------------
+model Schedule {
+  id          String        @id @default(cuid())
+  scheduledAt DateTime
+  status      ScheduleStatus @default(PENDING)
+  platform    Platform
+  entityId    String?       // published entity ID after sync
+  error       String?
+  attemptCount Int          @default(0)
+  metadata    Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  projectId   String?
+  project     Project?      @relation(fields: [projectId], references: [id])
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+
+  @@index([scheduledAt])
+  @@index([projectId, status])
+}
+
+enum ScheduleStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+// ---------------------------------------------------------------------------
+// 10. AgentSession - autonomous agent sessions
+// ---------------------------------------------------------------------------
+model AgentSession {
+  id          String         @id @default(cuid())
+  name        String
+  agentId     String?
+  config      Json!          // agent behaviour config
+  status      AgentStatus    @default(RUNNING)
+  result      Json?          // final output / summary
+  errorMessage String?
+  iterationCount Int          @default(0)
+  startedAt   DateTime       @default(now())
+  finishedAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  userId      String
+  user        User           @relation(fields: [userId], references: [id])
+
+  runs        AgentRun[]
+
+  @@index([userId, status])
+}
+
+enum AgentStatus {
+  QUEUED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// ---------------------------------------------------------------------------
+// 11. AgentRun - individual runs within an agent session
+// ---------------------------------------------------------------------------
+model AgentRun {
+  id          String   @id @default(cuid())
+  step        Int
+  action      String   // generate, review, optimize, publish
+  input       Json
+  output      Json?
+  success     Boolean
+  error       String?
+  durationMs  Int?
+  createdAt   DateTime @default(now())
+
+  sessionId   String
+  session     AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+// ---------------------------------------------------------------------------
+// 12. AbTest - A/B test configurations
+// ---------------------------------------------------------------------------
+model AbTest {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  variantA    Json!    // variant A content / config
+  variantB    Json!    // variant B content / config
+  metric      String   // views, engagement, conversion, ...
+  targetSize  Int      @default(100)
+  status      AbTestStatus @default(RUNNING)
+  results     Json?    // { variantA: {...}, variantB: {...} }
+  startedAt   DateTime @default(now())
+  endedAt     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  participants AbTestParticipant[]
+
+  @@index([userId, status])
+}
+
+enum AbTestStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  COMPLETED
+}
+
+// ---------------------------------------------------------------------------
+// 12b. AbTestParticipant - tracks which output went to which variant
+// ---------------------------------------------------------------------------
+model AbTestParticipant {
+  id          String   @id @default(cuid())
+  variant     String   // "A" | "B"
+  entityId    String   // content output ID
+
+  abTestId    String
+  abTest      AbTest   @relation(fields: [abTestId], references: [id], onDelete: Cascade)
+
+  @@unique([abTestId, entityId])
+}
+
+// ---------------------------------------------------------------------------
+// 13. TeamMember - team collaboration / tenant membership
+// ---------------------------------------------------------------------------
+model TeamMember {
+  id          String   @id @default(cuid())
+  role        TeamRole @default(MEMBER)
+  joinedAt    DateTime @default(now())
+  permissions Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId      String
+  teamName    String
+
+  @@unique([teamId, userId])
+}
+
+enum TeamRole {
+  ADMIN
+  EDITOR
+  MEMBER
+  VIEWER
+}
+
+// ---------------------------------------------------------------------------
+// 14. UserPlan - subscription plan definitions
+// ---------------------------------------------------------------------------
+model UserPlan {
+  id          String   @id @default(cuid())
+  name        String   @unique          // free, starter, pro, team, enterprise
+  tier        PlanTier @unique
+  price       Float
+  currency    String   @default("USD")
+  interval    PlanInterval
+  features    Json!           // feature flags and limits
+  maxCredits  Int?
+  maxProjects Int?
+  maxAgents   Int?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum PlanInterval {
+  MONTHLY
+  YEARLY
+}
+
+// ---------------------------------------------------------------------------
+// 15. Webhook - webhook integrations per user
+// ---------------------------------------------------------------------------
+model Webhook {
+  id          String   @id @default(cuid())
+  url         String
+  events      Json          // ["content.generated", "schedule.completed", ...]
+  secret      String?
+  isActive    Boolean  @default(true)
+  lastTriggeredAt DateTime?
+  failureCount Int         @default(0)
+  metadata    Json?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// 16. Integration - third-party integrations
+// ---------------------------------------------------------------------------
+model Integration {
+  id          String   @id @default(cuid())
+  provider    String        // zapier, make, n8n, custom
+  name        String
+  config      Json!         // provider-specific connection config
+  isActive    Boolean  @default(true)
+  lastSyncAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider])
+}
+
+// ---------------------------------------------------------------------------
+// 17. Notification - user notifications
+// ---------------------------------------------------------------------------
+model Notification {
+  id          String   @id @default(cuid())
+  type        NotificationType
+  title       String
+  body        String
+  data        Json?     // contextual payload
+  isRead      Boolean  @default(false)
+  actionUrl   String?
+  createdAt   DateTime @default(now())
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  TASK_COMPLETE
+  SCORE_ACHIEVED
+  SCHEDULE_REMINDER
+}
+
+// ---------------------------------------------------------------------------
+// 18. AuditLog - audit trail for user actions
+// ---------------------------------------------------------------------------
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String        // user.created, content.published, plan.upgraded, ...
+  entity      String?       // table name affected
+  entityId    String?       // record ID affected
+  changes     Json?         // { old: {...}, new: {...} }
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([entity, entityId])
+}
+
+// ---------------------------------------------------------------------------
+// 19. UsageMetric - token / API usage tracking
+// ---------------------------------------------------------------------------
+model UsageMetric {
+  id          String   @id @default(cuid())
+  category    UsageCategory
+  operation   String    // llm.call, video.gen, image.gen, score.compute, ...
+  tokensIn    Int?
+  tokensOut   Int?
+  creditsUsed Int      @default(1)
+  cost        Float?
+  status      String   @default("success")
+  error       String?
+  durationMs  Int?
+  metadata    Json?
+  recordedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, recordedAt])
+  @@index([userId, category, recordedAt])
+}
+
+enum UsageCategory {
+  TEXT_GENERATION
+  VIDEO_GENERATION
+  IMAGE_GENERATION
+  SCORING
+  KNOWLEDGE_INDEX
+  ROUTING
+  WEBHOOK
+}
+
+// ---------------------------------------------------------------------------
+// 20. Insight - content insights (AI-generated analysis and suggestions)
+// ---------------------------------------------------------------------------
+model Insight {
+  id          String   @id @default(cuid())
+  type        String        // topic_suggestion, trend_alert, performance_tip, ...
+  title       String
+  body        String
+  severity    InsightSeverity @default(NORMAL)
+  isResolved  Boolean  @default(false)
+  relatedEntityId String?
+  relatedEntityType  String? // project, content_output, analytics
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, isResolved])
+}
+
+enum InsightSeverity {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+// ---------------------------------------------------------------------------
+// 21. PromptCacheEntry - cached prompt results for cost efficiency
+// ---------------------------------------------------------------------------
+model PromptCacheEntry {
+  id          String   @id @default(cuid())
+  promptHash  String    // hash of the input prompt
+  prompt      String
+  result      Json!
+  ttl         Int       // seconds until expiration
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, promptHash])
+  @@index([expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// Seed helper - ensure default plan tiers exist
+// ---------------------------------------------------------------------------
+// INSERT INTO "UserPlan" ("id","name","tier","price","currency","interval","features","maxCredits","maxProjects","maxAgents","isActive") VALUES
+//   (cuid(),'free','FREE',0,'USD','MONTHLY',{},0,5,0,true),
+//   (cuid(),'starter','STARTER',9.99,'USD','MONTHLY',{},1000,20,2,true),
+//   (cuid(),'pro','PRO',29.99,'USD','MONTHLY',{},5000,100,10,true),
+//   (cuid(),'team','TEAM',99.99,'USD','MONTHLY',{},20000,500,50,true),
+//   (cuid(),'enterprise','ENTERPRISE',299.99,'USD','MONTHLY',{},999999,unlimited,unlimited,true);
