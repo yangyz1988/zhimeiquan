@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 
 export async function POST(
   request: NextRequest,
@@ -29,7 +28,7 @@ export async function POST(
       body: body.body,
       script: body.script,
       tags: body.tags ? JSON.stringify(body.tags) : null,
-      fireScore: body.fireScore ?? Prisma.JsonNull,
+      fireScore: body.fireScore ?? null,
       level: body.level,
     },
   });

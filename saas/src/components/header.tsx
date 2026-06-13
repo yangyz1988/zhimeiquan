@@ -34,31 +34,32 @@ function ClerkAuthButton() {
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-black/10 backdrop-blur-xl">
       <div className="container flex h-14 items-center">
-        <Link href="/" className="flex items-center space-x-2">
+        <Link href="/" className="flex items-center gap-2">
           <Zap className="h-6 w-6 text-orange-500" />
-          <span className="font-bold">智媒圈</span>
+          <span className="font-bold text-white">智媒圈</span>
         </Link>
-        <nav className="ml-auto flex items-center space-x-1">
-          <Link href="/generate" className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-accent">
-            生成内容
-          </Link>
-          <Link href="/monitor" className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-accent">
-            爆款监控
-          </Link>
-          <Link href="/tools" className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-accent">
-            工具箱
-          </Link>
-          <Link href="/knowledge" className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-accent">
-            知识体系
-          </Link>
-          <Link href="/experts" className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-accent">
-            专家
-          </Link>
-          <Link href="/pricing" className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-accent">
-            定价
-          </Link>
+        <nav className="ml-auto flex items-center gap-0.5">
+          {["/generate", "/monitor", "/tools", "/knowledge", "/experts", "/pricing"].map((path) => {
+            const labels: Record<string, string> = {
+              "/generate": "生成内容",
+              "/monitor": "爆款监控",
+              "/tools": "工具箱",
+              "/knowledge": "知识体系",
+              "/experts": "专家",
+              "/pricing": "定价",
+            };
+            return (
+              <Link
+                key={path}
+                href={path}
+                className="px-3 py-2 text-sm text-white/50 hover:text-white transition-colors rounded-md"
+              >
+                {labels[path]}
+              </Link>
+            );
+          })}
           <ThemeToggle />
           <ClerkAuthButton />
         </nav>
