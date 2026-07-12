@@ -21,6 +21,7 @@ from routers import (
     model_router,
     health,
     insights,
+    fire_score,
 )
 from services.error_handler import ServiceError
 from services.logging import logger
