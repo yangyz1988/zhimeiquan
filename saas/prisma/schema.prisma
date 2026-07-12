@@ -27,38 +27,42 @@ datasource db {
 // 1. User - enhanced with plan, clerkId, avatar, and team/tenant awareness
 // ---------------------------------------------------------------------------
 model User {
-  id           String        @id @default(cuid())
-  clerkId      String?       @unique
-  email        String        @unique
-  name         String?
-  avatar       String?
-  plan         PlanTier      @default(FREE)
-  planExpires  DateTime?
-  credits      Int           @default(0)
-  isTeamAdmin  Boolean       @default(false)
-  settings     Json?
-  lastLoginAt  DateTime?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id          String    @id @default(cuid())
+  clerkId     String?   @unique
+  email       String    @unique
+  name        String?
+  avatar      String?
+  plan        PlanTier  @default(FREE)
+  planExpires DateTime?
+  credits     Int       @default(0)
+  isTeamAdmin Boolean   @default(false)
+  settings    Json?
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  projects               Project[]
-  accounts               PlatformAccount[]
-  contentOutputs         ContentOutput[]
-  knowledgeArticles      KnowledgeArticle[]
-  contentVersions        ContentVersion[]
-  schedules              Schedule[]
-  agentSessions          AgentSession[]
-  abTests                AbTest[]
-  teamMembers            TeamMember[]
-  webhooks               Webhook[]
-  integrations           Integration[]
-  notifications          Notification[]
-  auditLogs              AuditLog[]
-  usageMetrics           UsageMetric[]
-  insights               Insight[]
-  promptCacheEntries     PromptCacheEntry[]
-  contentTemplates       ContentTemplate[]
-  analytics              Analytics[]
+  projects             Project[]
+  accounts             PlatformAccount[]
+  contentOutputs       ContentOutput[]
+  knowledgeArticles    KnowledgeArticle[]
+  contentVersions      ContentVersion[]
+  schedules            Schedule[]
+  agentSessions        AgentSession[]
+  abTests              AbTest[]
+  teamMembers          TeamMember[]
+  webhooks             Webhook[]
+  integrations         Integration[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+  usageMetrics         UsageMetric[]
+  insights             Insight[]
+  promptCacheEntries   PromptCacheEntry[]
+  contentTemplates     ContentTemplate[]
+  analytics            Analytics[]
+  mediaAssets          MediaAsset[]
+  comments             Comment[]
+  subscriptions        Subscription[]
+  distributionChannels DistributionChannel[]
 }
 
 enum PlanTier {
@@ -73,24 +77,24 @@ enum PlanTier {
 // 2. Project - content project owned by a user
 // ---------------------------------------------------------------------------
 model Project {
-  id          String   @id @default(cuid())
-  name        String
-  topic       String
-  platforms   Json          // ["douyin", "xiaohongshu", ...]
-  persona     String?
-  tone        String?
+  id             String        @id @default(cuid())
+  name           String
+  topic          String
+  platforms      Json // ["douyin", "xiaohongshu", ...]
+  persona        String?
+  tone           String?
   targetAudience String?
-  duration    Int?
-  status      ProjectStatus @default(DRAFT)
-  config      Json?       // project-level generation config
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  duration       Int?
+  status         ProjectStatus @default(DRAFT)
+  config         Json? // project-level generation config
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  userId      String
-  user        User       @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
-  outputs     ContentOutput[]
-  schedules   Schedule[]
+  outputs   ContentOutput[]
+  schedules Schedule[]
 }
 
 enum ProjectStatus {
@@ -105,25 +109,25 @@ enum ProjectStatus {
 // 3. ContentOutput - generated content with Fire Score and metadata
 // ---------------------------------------------------------------------------
 model ContentOutput {
-  id          String        @id @default(cuid())
+  id          String            @id @default(cuid())
   title       String
   body        String
   script      String?
-  tags        Json?         // string[] of tags
-  fireScore   Json?         // { platform: { score, rationale, tips } }
-  level       String?       // content difficulty/reading level
-  platform    String?       // target platform for this output
+  tags        Json? // string[] of tags
+  fireScore   Json? // { platform: { score, rationale, tips } }
+  level       String? // content difficulty/reading level
+  platform    String? // target platform for this output
   contentType ContentOutputType @default(ARTICLE)
-  status      OutputStatus  @default(DRAFT)
-  metadata    Json?         // extra fields (word count, reading time, etc.)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  status      OutputStatus      @default(DRAFT)
+  metadata    Json? // extra fields (word count, reading time, etc.)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
-  projectId   String
-  project     Project       @relation(fields: [projectId], references: [id])
-  userId      String?
-  user        User?         @relation(fields: [userId], references: [id])
-  versions    ContentVersion[]
+  projectId String
+  project   Project          @relation(fields: [projectId], references: [id])
+  userId    String?
+  user      User?            @relation(fields: [userId], references: [id])
+  versions  ContentVersion[]
 
   @@index([projectId])
   @@index([userId])
@@ -149,40 +153,40 @@ enum OutputStatus {
 // 4. PlatformAccount - connected social / content platform accounts
 // ---------------------------------------------------------------------------
 model PlatformAccount {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   platform    Platform
-  platformId  String          // ID on the external platform
+  platformId  String // ID on the external platform
   username    String?
   displayName String?
   avatar      String?
   accessToken String?
   refreshUrl  String?
   metadata    Json?
-  isActive    Boolean  @default(true)
-  connectedAt DateTime @default(now())
+  isActive    Boolean   @default(true)
+  connectedAt DateTime  @default(now())
   lastSyncAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  userId      String
-  user        User       @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
   @@unique([userId, platform, platformId])
 }
 
 enum Platform {
-  DOUYIN        // 抖音
-  XIAOHONGSHU   // 小红书
-  BILIBILI      // B站
+  DOUYIN // 抖音
+  XIAOHONGSHU // 小红书
+  BILIBILI // B站
   WECHAT_OFFICIAL // 公众号
-  KUAI_SHOU     // 快手
-  WEIBO         // 微博
-  ZHIHU         // 知乎
-  TODOU         // 头条
-  XI_GUA        // 西瓜视频
-  SHI_PIN_HAO   // 视频号
-  XIAN_YU       // 闲鱼
-  TIKTOK        // TikTok
+  KUAI_SHOU // 快手
+  WEIBO // 微博
+  ZHIHU // 知乎
+  TODOU // 头条
+  XI_GUA // 西瓜视频
+  SHI_PIN_HAO // 视频号
+  XIAN_YU // 闲鱼
+  TIKTOK // TikTok
 }
 
 // ---------------------------------------------------------------------------
@@ -193,17 +197,17 @@ model ContentTemplate {
   name        String
   description String?
   platform    String?
-  type        String          // article, video_script, social_post, ...
-  structure   Json            // outline / section definitions
-  prompt      String          // template prompt for generation
-  variables   Json?           // list of placeholders like {{topic}}, {{audience}}
+  type        String // article, video_script, social_post, ...
+  structure   Json // outline / section definitions
+  prompt      String // template prompt for generation
+  variables   Json? // list of placeholders like {{topic}}, {{audience}}
   isPublic    Boolean  @default(false)
   popularity  Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  userId      String?
-  user        User?       @relation(fields: [userId], references: [id])
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
 
   @@index([platform, type])
 }
@@ -216,7 +220,7 @@ model KnowledgeArticle {
   title       String
   content     String
   category    String
-  tags        Json?       // string[]
+  tags        Json? // string[]
   version     Int      @default(1)
   isPublished Boolean  @default(false)
   wordCount   Int?
@@ -224,8 +228,8 @@ model KnowledgeArticle {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  userId      String?
-  user        User?       @relation(fields: [userId], references: [id])
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
 
   @@index([category])
 }
@@ -234,18 +238,18 @@ model KnowledgeArticle {
 // 7. ContentVersion - version history per content output
 // ---------------------------------------------------------------------------
 model ContentVersion {
-  id          String   @id @default(cuid())
-  title       String
-  body        String
-  script      String?
-  summary     String    // change summary / commit message
-  versionNum  Int
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  title      String
+  body       String
+  script     String?
+  summary    String // change summary / commit message
+  versionNum Int
+  createdAt  DateTime @default(now())
 
-  contentId   String
-  content     ContentOutput @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User       @relation(fields: [userId], references: [id])
+  contentId String
+  content   ContentOutput @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id])
 
   @@unique([contentId, versionNum])
   @@index([contentId])
@@ -257,19 +261,19 @@ model ContentVersion {
 model Analytics {
   id          String   @id @default(cuid())
   platform    Platform
-  entityId    String    // external platform post/video/article ID
+  entityId    String // external platform post/video/article ID
   views       Int      @default(0)
   likes       Int      @default(0)
   comments    Int      @default(0)
   shares      Int      @default(0)
   saves       Int      @default(0)
   clicks      Int      @default(0)
-  watchTime   Int?     // seconds
+  watchTime   Int? // seconds
   revenue     Float?
   collectedAt DateTime @default(now())
 
-  userId      String?
-  user        User?       @relation(fields: [userId], references: [id])
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
 
   @@unique([platform, entityId, collectedAt])
   @@index([entityId])
@@ -281,21 +285,21 @@ model Analytics {
 // 9. Schedule - content scheduling with status tracking
 // ---------------------------------------------------------------------------
 model Schedule {
-  id          String        @id @default(cuid())
-  scheduledAt DateTime
-  status      ScheduleStatus @default(PENDING)
-  platform    Platform
-  entityId    String?       // published entity ID after sync
-  error       String?
-  attemptCount Int          @default(0)
-  metadata    Json?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id           String         @id @default(cuid())
+  scheduledAt  DateTime
+  status       ScheduleStatus @default(PENDING)
+  platform     Platform
+  entityId     String? // published entity ID after sync
+  error        String?
+  attemptCount Int            @default(0)
+  metadata     Json?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
-  projectId   String?
-  project     Project?      @relation(fields: [projectId], references: [id])
-  userId      String
-  user        User          @relation(fields: [userId], references: [id])
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
 
   @@index([scheduledAt])
   @@index([projectId, status])
@@ -313,23 +317,23 @@ enum ScheduleStatus {
 // 10. AgentSession - autonomous agent sessions
 // ---------------------------------------------------------------------------
 model AgentSession {
-  id          String         @id @default(cuid())
-  name        String
-  agentId     String?
-  config      Json           // agent behaviour config
-  status      AgentStatus    @default(RUNNING)
-  result      Json?          // final output / summary
-  errorMessage String?
-  iterationCount Int          @default(0)
-  startedAt   DateTime       @default(now())
-  finishedAt  DateTime?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id             String      @id @default(cuid())
+  name           String
+  agentId        String?
+  config         Json // agent behaviour config
+  status         AgentStatus @default(RUNNING)
+  result         Json? // final output / summary
+  errorMessage   String?
+  iterationCount Int         @default(0)
+  startedAt      DateTime    @default(now())
+  finishedAt     DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
-  userId      String
-  user        User           @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
-  runs        AgentRun[]
+  runs AgentRun[]
 
   @@index([userId, status])
 }
@@ -347,18 +351,18 @@ enum AgentStatus {
 // 11. AgentRun - individual runs within an agent session
 // ---------------------------------------------------------------------------
 model AgentRun {
-  id          String   @id @default(cuid())
-  step        Int
-  action      String   // generate, review, optimize, publish
-  input       Json
-  output      Json?
-  success     Boolean
-  error       String?
-  durationMs  Int?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  step       Int
+  action     String // generate, review, optimize, publish
+  input      Json
+  output     Json?
+  success    Boolean
+  error      String?
+  durationMs Int?
+  createdAt  DateTime @default(now())
 
-  sessionId   String
-  session     AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId String
+  session   AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
 }
@@ -367,22 +371,22 @@ model AgentRun {
 // 12. AbTest - A/B test configurations
 // ---------------------------------------------------------------------------
 model AbTest {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   name        String
   description String?
-  variantA    Json     // variant A content / config
-  variantB    Json     // variant B content / config
-  metric      String   // views, engagement, conversion, ...
-  targetSize  Int      @default(100)
+  variantA    Json // variant A content / config
+  variantB    Json // variant B content / config
+  metric      String // views, engagement, conversion, ...
+  targetSize  Int          @default(100)
   status      AbTestStatus @default(RUNNING)
-  results     Json?    // { variantA: {...}, variantB: {...} }
-  startedAt   DateTime @default(now())
+  results     Json? // { variantA: {...}, variantB: {...} }
+  startedAt   DateTime     @default(now())
   endedAt     DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
   participants AbTestParticipant[]
 
@@ -400,12 +404,12 @@ enum AbTestStatus {
 // 12b. AbTestParticipant - tracks which output went to which variant
 // ---------------------------------------------------------------------------
 model AbTestParticipant {
-  id          String   @id @default(cuid())
-  variant     String   // "A" | "B"
-  entityId    String   // content output ID
+  id       String @id @default(cuid())
+  variant  String // "A" | "B"
+  entityId String // content output ID
 
-  abTestId    String
-  abTest      AbTest   @relation(fields: [abTestId], references: [id], onDelete: Cascade)
+  abTestId String
+  abTest   AbTest @relation(fields: [abTestId], references: [id], onDelete: Cascade)
 
   @@unique([abTestId, entityId])
 }
@@ -421,10 +425,10 @@ model TeamMember {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  teamId      String
-  teamName    String
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId   String
+  teamName String
 
   @@unique([teamId, userId])
 }
@@ -440,19 +444,19 @@ enum TeamRole {
 // 14. UserPlan - subscription plan definitions
 // ---------------------------------------------------------------------------
 model UserPlan {
-  id          String   @id @default(cuid())
-  name        String   @unique          // free, starter, pro, team, enterprise
-  tier        PlanTier @unique
+  id          String       @id @default(cuid())
+  name        String       @unique // free, starter, pro, team, enterprise
+  tier        PlanTier     @unique
   price       Float
-  currency    String   @default("USD")
+  currency    String       @default("USD")
   interval    PlanInterval
-  features    Json            // feature flags and limits
+  features    Json // feature flags and limits
   maxCredits  Int?
   maxProjects Int?
   maxAgents   Int?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 enum PlanInterval {
@@ -464,19 +468,19 @@ enum PlanInterval {
 // 15. Webhook - webhook integrations per user
 // ---------------------------------------------------------------------------
 model Webhook {
-  id          String   @id @default(cuid())
-  url         String
-  events      Json          // ["content.generated", "schedule.completed", ...]
-  secret      String?
-  isActive    Boolean  @default(true)
+  id              String    @id @default(cuid())
+  url             String
+  events          Json // ["content.generated", "schedule.completed", ...]
+  secret          String?
+  isActive        Boolean   @default(true)
   lastTriggeredAt DateTime?
-  failureCount Int         @default(0)
-  metadata    Json?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime     @updatedAt
+  failureCount    Int       @default(0)
+  metadata        Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  userId      String
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -485,17 +489,17 @@ model Webhook {
 // 16. Integration - third-party integrations
 // ---------------------------------------------------------------------------
 model Integration {
-  id          String   @id @default(cuid())
-  provider    String        // zapier, make, n8n, custom
-  name        String
-  config      Json          // provider-specific connection config
-  isActive    Boolean  @default(true)
-  lastSyncAt  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String    @id @default(cuid())
+  provider   String // zapier, make, n8n, custom
+  name       String
+  config     Json // provider-specific connection config
+  isActive   Boolean   @default(true)
+  lastSyncAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-  userId      String
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, provider])
 }
@@ -504,17 +508,17 @@ model Integration {
 // 17. Notification - user notifications
 // ---------------------------------------------------------------------------
 model Notification {
-  id          String   @id @default(cuid())
-  type        NotificationType
-  title       String
-  body        String
-  data        Json?     // contextual payload
-  isRead      Boolean  @default(false)
-  actionUrl   String?
-  createdAt   DateTime @default(now())
+  id        String           @id @default(cuid())
+  type      NotificationType
+  title     String
+  body      String
+  data      Json? // contextual payload
+  isRead    Boolean          @default(false)
+  actionUrl String?
+  createdAt DateTime         @default(now())
 
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead])
   @@index([userId, createdAt])
@@ -534,17 +538,17 @@ enum NotificationType {
 // 18. AuditLog - audit trail for user actions
 // ---------------------------------------------------------------------------
 model AuditLog {
-  id          String   @id @default(cuid())
-  action      String        // user.created, content.published, plan.upgraded, ...
-  entity      String?       // table name affected
-  entityId    String?       // record ID affected
-  changes     Json?         // { old: {...}, new: {...} }
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  action    String // user.created, content.published, plan.upgraded, ...
+  entity    String? // table name affected
+  entityId  String? // record ID affected
+  changes   Json? // { old: {...}, new: {...} }
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
 
-  userId      String
-  user        User       @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
   @@index([userId, createdAt])
   @@index([entity, entityId])
@@ -554,22 +558,22 @@ model AuditLog {
 // 19. UsageMetric - token / API usage tracking
 // ---------------------------------------------------------------------------
 model UsageMetric {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   category    UsageCategory
-  operation   String    // llm.call, video.gen, image.gen, score.compute, ...
+  operation   String // llm.call, video.gen, image.gen, score.compute, ...
   tokensIn    Int?
   tokensOut   Int?
-  creditsUsed Int      @default(1)
+  creditsUsed Int           @default(1)
   cost        Float?
-  status      String   @default("success")
+  status      String        @default("success")
   error       String?
   durationMs  Int?
   metadata    Json?
-  recordedAt  DateTime @default(now())
-  createdAt   DateTime @default(now())
+  recordedAt  DateTime      @default(now())
+  createdAt   DateTime      @default(now())
 
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
   @@index([userId, recordedAt])
   @@index([userId, category, recordedAt])
@@ -589,19 +593,19 @@ enum UsageCategory {
 // 20. Insight - content insights (AI-generated analysis and suggestions)
 // ---------------------------------------------------------------------------
 model Insight {
-  id          String   @id @default(cuid())
-  type        String        // topic_suggestion, trend_alert, performance_tip, ...
-  title       String
-  body        String
-  severity    InsightSeverity @default(NORMAL)
-  isResolved  Boolean  @default(false)
-  relatedEntityId String?
-  relatedEntityType  String? // project, content_output, analytics
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String          @id @default(cuid())
+  type              String // topic_suggestion, trend_alert, performance_tip, ...
+  title             String
+  body              String
+  severity          InsightSeverity @default(NORMAL)
+  isResolved        Boolean         @default(false)
+  relatedEntityId   String?
+  relatedEntityType String? // project, content_output, analytics
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, type, isResolved])
 }
@@ -617,19 +621,366 @@ enum InsightSeverity {
 // 21. PromptCacheEntry - cached prompt results for cost efficiency
 // ---------------------------------------------------------------------------
 model PromptCacheEntry {
-  id          String   @id @default(cuid())
-  promptHash  String    // hash of the input prompt
-  prompt      String
-  result      Json
-  ttl         Int       // seconds until expiration
-  expiresAt   DateTime
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  promptHash String // hash of the input prompt
+  prompt     String
+  result     Json
+  ttl        Int // seconds until expiration
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
 
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, promptHash])
   @@index([expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// 22. MediaAsset — 媒体资产管理
+// ---------------------------------------------------------------------------
+model MediaAsset {
+  id           String   @id @default(cuid())
+  fileName     String
+  originalName String
+  mimeType     String
+  size         Int // bytes
+  url          String // CDN/存储路径
+  thumbnailUrl String? // 缩略图 URL
+  width        Int?
+  height       Int?
+  duration     Float? // 视频/音频时长（秒）
+  altText      String? // 无障碍描述
+  tags         Json? // string[] 标签
+  folder       String? // 文件夹分类
+  usageCount   Int      @default(0)
+  isPublic     Boolean  @default(false)
+  metadata     Json? // EXIF/附加信息
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, folder])
+  @@index([userId, mimeType])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// 23. Comment — 协作评论系统
+// ---------------------------------------------------------------------------
+model Comment {
+  id         String   @id @default(cuid())
+  body       String
+  isResolved Boolean  @default(false)
+  parentId   String? // 回复某条评论
+  entityType String // content_output, project, media_asset, ...
+  entityId   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  userId  String
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([parentId])
+}
+
+// ---------------------------------------------------------------------------
+// 24. Tag / TagGroup / ContentTag — 标签体系
+// ---------------------------------------------------------------------------
+model Tag {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  color       String? // hex color
+  description String?
+  usageCount  Int      @default(0)
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  groupId     String?
+  group       TagGroup?    @relation(fields: [groupId], references: [id])
+  contentTags ContentTag[]
+
+  @@index([groupId])
+  @@index([usageCount])
+}
+
+model TagGroup {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  color       String?
+  description String?
+  sortOrder   Int      @default(0)
+  isCollapsed Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tags Tag[]
+
+  @@index([sortOrder])
+}
+
+model ContentTag {
+  entityType String // content_output, project, media_asset, comment, knowledge_article
+  entityId   String
+  createdAt  DateTime @default(now())
+
+  tagId String
+  tag   Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([tagId, entityType, entityId])
+  @@index([entityType, entityId])
+}
+
+// ---------------------------------------------------------------------------
+// 25. Subscription / Invoice / BillingCycle — 订阅周期管理
+// ---------------------------------------------------------------------------
+model Subscription {
+  id                   String             @id @default(cuid())
+  status               SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean            @default(false)
+  canceledAt           DateTime?
+  trialEnd             DateTime?
+  stripeSubscriptionId String?            @unique
+  stripeCustomerId     String?
+  stripePriceId        String?
+  paymentMethod        String? // card, alipay, wechat
+  planTier             PlanTier           @default(FREE)
+  autoRenew            Boolean            @default(true)
+  metadata             Json?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  userId   String    @unique
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([currentPeriodEnd])
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  TRIALING
+  PAUSED
+}
+
+model Invoice {
+  id              String        @id @default(cuid())
+  stripeInvoiceId String?       @unique
+  amount          Float
+  currency        String        @default("CNY")
+  status          InvoiceStatus
+  invoiceUrl      String?
+  invoicePdf      String?
+  periodStart     DateTime
+  periodEnd       DateTime
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
+model BillingCycle {
+  id             String   @id @default(cuid())
+  cycleStart     DateTime
+  cycleEnd       DateTime
+  creditsUsed    Int      @default(0)
+  creditsLimit   Int      @default(1000)
+  apiCalls       Int      @default(0)
+  apiCallsLimit  Int      @default(10000)
+  storageBytes   Float    @default(0)
+  storageLimit   Float    @default(1073741824)
+  isOverage      Boolean  @default(false)
+  overageCharges Float    @default(0)
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  userId String
+
+  @@unique([userId, cycleStart])
+  @@index([userId, cycleEnd])
+}
+
+// ---------------------------------------------------------------------------
+// 26. DistributionChannel / PublishLog / ChannelMetric — 内容分发渠道
+// ---------------------------------------------------------------------------
+model DistributionChannel {
+  id             String        @id @default(cuid())
+  name           String // "抖音企业号", "小红书商业号"
+  platform       Platform
+  channelType    ChannelType   @default(SOCIAL)
+  accountName    String?
+  accountId      String?
+  config         Json?
+  dailyLimit     Int?
+  scheduledCount Int           @default(0)
+  isActive       Boolean       @default(true)
+  lastSyncAt     DateTime?
+  healthStatus   ChannelHealth @default(UNKNOWN)
+  metrics        Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publishLogs    PublishLog[]
+  channelMetrics ChannelMetric[]
+
+  @@unique([userId, platform, accountId])
+  @@index([userId, platform])
+  @@index([isActive])
+}
+
+enum ChannelType {
+  SOCIAL
+  BLOG
+  VIDEO
+  COMMUNITY
+  EMAIL
+  RSS
+  CUSTOM
+}
+
+enum ChannelHealth {
+  UNKNOWN
+  HEALTHY
+  RATE_LIMITED
+  AUTH_EXPIRED
+  ERROR
+  DISCONNECTED
+}
+
+model PublishLog {
+  id           String        @id @default(cuid())
+  entityId     String
+  entityType   String // content_output
+  platform     Platform
+  externalUrl  String?
+  status       PublishStatus @default(PENDING)
+  errorMessage String?
+  retryCount   Int           @default(0)
+  publishedAt  DateTime?
+  scheduledAt  DateTime?
+  createdAt    DateTime      @default(now())
+
+  channelId String
+  channel   DistributionChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  userId    String?
+
+  @@index([channelId, status])
+  @@index([entityId])
+  @@index([scheduledAt])
+}
+
+enum PublishStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  CANCELLED
+  RESCHEDULED
+}
+
+model ChannelMetric {
+  id            String   @id @default(cuid())
+  followers     Int      @default(0)
+  engagement    Float    @default(0)
+  posts         Int      @default(0)
+  avgViews      Float    @default(0)
+  avgLikes      Float    @default(0)
+  avgComments   Float    @default(0)
+  avgShares     Float    @default(0)
+  topPerforming Json?
+  collectedAt   DateTime @default(now())
+
+  channelId String
+  channel   DistributionChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@index([channelId, collectedAt])
+}
+
+// ---------------------------------------------------------------------------
+// 27. TrendEvent / TrendSnapshot — 热点事件追踪
+// ---------------------------------------------------------------------------
+model TrendEvent {
+  id                 String    @id @default(cuid())
+  title              String
+  summary            String?
+  sourcePlatform     Platform
+  sourceUrl          String?
+  category           String?
+  keywords           Json? // string[]
+  heatScore          Float     @default(0)
+  heatTrend          HeatTrend @default(STABLE)
+  mentionCount       Int       @default(0)
+  firstSeenAt        DateTime
+  lastSeenAt         DateTime  @default(now())
+  peakAt             DateTime?
+  isActive           Boolean   @default(true)
+  lifespan           Int? // 预估生命周期（小时）
+  relatedEvents      Json?
+  contentSuggestions Json? // AI 生成的角度建议
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  snapshots TrendSnapshot[]
+
+  @@index([sourcePlatform, isActive])
+  @@index([heatScore])
+  @@index([category])
+  @@index([firstSeenAt])
+}
+
+enum HeatTrend {
+  RISING
+  STABLE
+  PEAKING
+  DECLINING
+  EXPIRED
+}
+
+model TrendSnapshot {
+  id              String   @id @default(cuid())
+  heatScore       Float
+  mentionCount    Int
+  relatedCount    Int      @default(0)
+  sentimentRatio  Json? // { positive, negative, neutral }
+  topKeywords     Json? // 当前热词 TOP 10
+  sourceBreakdown Json? // { platform: count }
+  recordedAt      DateTime @default(now())
+
+  eventId String
+  event   TrendEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, recordedAt])
 }
 
 // ---------------------------------------------------------------------------

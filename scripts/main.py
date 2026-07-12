@@ -28,6 +28,13 @@ from routers import (
     calibrate,
     knowledge,
     payment,
+    media_assets,
+    comments,
+    tags,
+    subscriptions,
+    channels,
+    publish_logs,
+    trends,
 )
 from services.error_handler import ServiceError, error_response
 from services.logging import logger
@@ -137,6 +144,13 @@ app.include_router(calibrate.router, prefix="/api/v1/calibrate", tags=["Fire Sco
 app.include_router(knowledge.router, prefix="/api/v1/knowledge", tags=["知识图谱"])
 app.include_router(payment.router, prefix="/api/v1/payment", tags=["支付"])
 app.include_router(health.router, tags=["健康检查"])
+app.include_router(media_assets.router, prefix="/api/v1/media", tags=["媒体资产"])
+app.include_router(comments.router, prefix="/api/v1/comments", tags=["协作评论"])
+app.include_router(tags.router, prefix="/api/v1/tags", tags=["标签体系"])
+app.include_router(subscriptions.router, prefix="/api/v1/subscriptions", tags=["订阅管理"])
+app.include_router(channels.router, prefix="/api/v1/channels", tags=["分发渠道"])
+app.include_router(publish_logs.router, prefix="/api/v1/publish-logs", tags=["发布日志"])
+app.include_router(trends.router, prefix="/api/v1/trends", tags=["热点追踪"])
 
 
 @app.get("/health")

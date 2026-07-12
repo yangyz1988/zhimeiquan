@@ -18,4 +18,11 @@ from . import (
     competitors,
     stream,
     payment,
+    media_assets,
+    comments,
+    tags,
+    subscriptions,
+    channels,
+    publish_logs,
+    trends,
 )
