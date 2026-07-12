@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   saas:
     build:
@@ -22,6 +24,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - zhimeiquan-net
 
   api:
     build:
@@ -31,7 +35,9 @@ services:
       - "8000:8000"
     environment:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-}
       - REDIS_URL=redis://redis:6379
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
     depends_on:
       - redis
     volumes:
@@ -42,6 +48,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - zhimeiquan-net
 
   redis:
     image: redis:7-alpine
@@ -55,6 +63,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - zhimeiquan-net
 
   nginx:
     image: nginx:alpine
@@ -67,8 +77,20 @@ services:
       - saas
       - api
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - zhimeiquan-net
 
 volumes:
   saas_data:
   api_data:
   redis_data:
+
+networks:
+  zhimeiquan-net:
+    driver: bridge

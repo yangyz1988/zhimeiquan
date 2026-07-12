@@ -3,7 +3,7 @@
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
-import { type KeyboardEvent, type forwardRef } from "react";
+import { type KeyboardEvent, forwardRef } from "react";
 
 /** 可点击的 Badge 样式变体 */
 const clickBadgeVariants = cva(
@@ -57,7 +57,7 @@ export const ClickableBadge = forwardRef<HTMLDivElement, ClickableBadgeProps>(
         aria-pressed={active}
         aria-label={ariaLabel}
         className={cn(
-          clickBadgeVariants({ variant: active ? `glow${variant.charAt(0).toUpperCase() + variant.slice(1)}` : variant }),
+          clickBadgeVariants({ variant: active && variant ? (`glow${variant.charAt(0).toUpperCase() + variant.slice(1)}` as "glowOrange" | "glowBlue" | "glowPurple" | "glowGreen") : (variant ?? "outline") }),
           className,
         )}
         onClick={onClick}

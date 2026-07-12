@@ -25,176 +25,305 @@ class RuleAnalyzer:
         "权威型": r"(专家|大V|官方|认证|专业|资深)",
     }
 
-    # 平台算法权重
-    PLATFORM_RULES = {
+    # 平台算法权重 - 覆盖全部 13 个平台
+    PLATFORM_RULES: dict[str, dict[str, Any]] = {
         "抖音": {
             "title_max_len": 30,
             "hook_time": 3,
             "key_factors": ["完播率", "互动率", "分享率"],
             "content_type": "短视频",
+            "category": "短视频",
             "best_duration": [15, 30, 60],
+            "core_metric": "完播率",
+            "cold_start_hours": "1-3",
+            "qualification": "完播率>45%, 点赞率>3%, 评论率>0.5%",
         },
         "小红书": {
             "title_max_len": 20,
             "hook_time": 3,
             "key_factors": ["收藏率", "点赞率", "评论率"],
             "content_type": "图文/视频",
+            "category": "种草",
             "best_duration": [60, 180, 300],
+            "core_metric": "收藏率",
+            "cold_start_hours": "2-6",
+            "qualification": "CTR>12%, 收藏率>5%",
         },
         "B站": {
             "title_max_len": 40,
             "hook_time": 5,
             "key_factors": ["播放量", "弹幕数", "投币数"],
             "content_type": "中长视频",
+            "category": "中长视频",
             "best_duration": [300, 600, 900],
+            "core_metric": "播放量",
+            "cold_start_hours": "6-24",
+            "qualification": "CTR>8%, 投币率>2%",
         },
-        "公众号": {
-            "title_max_len": 64,
+        "微博": {
+            "title_max_len": 40,
             "hook_time": 0,
-            "key_factors": ["打开率", "分享率", "在看数"],
+            "key_factors": ["转发量", "评论量", "点赞量"],
             "content_type": "图文",
+            "category": "社交",
             "best_duration": [],
+            "core_metric": "转发量",
+            "cold_start_hours": "0.5-2",
+            "qualification": "互动率>2%",
+        },
+        "知乎": {
+            "title_max_len": 50,
+            "hook_time": 0,
+            "key_factors": ["赞同数", "收藏数", "评论数"],
+            "content_type": "问答",
+            "category": "问答",
+            "best_duration": [],
+            "core_metric": "赞同数",
+            "cold_start_hours": "24-72",
+            "qualification": "收藏/赞比>0.8",
+        },
+        "头条": {
+            "title_max_len": 30,
+            "hook_time": 0,
+            "key_factors": ["阅读完成率", "CTR", "评论数"],
+            "content_type": "资讯",
+            "category": "资讯",
+            "best_duration": [],
+            "core_metric": "阅读完成率",
+            "cold_start_hours": "1-4",
+            "qualification": "CTR>5%, 完成率>30%",
+        },
+        "快手": {
+            "title_max_len": 20,
+            "hook_time": 3,
+            "key_factors": ["完播率", "点赞率", "关注率"],
+            "content_type": "短视频",
+            "category": "短视频",
+            "best_duration": [15, 30, 60],
+            "core_metric": "完播率",
+            "cold_start_hours": "1-2",
+            "qualification": "完播率>35%",
         },
         "YouTube": {
             "title_max_len": 100,
             "hook_time": 5,
             "key_factors": ["CTR", "观看时长", "订阅转化"],
             "content_type": "视频",
+            "category": "中长视频",
             "best_duration": [600, 900, 1200],
+            "core_metric": "观看时长",
+            "cold_start_hours": "6-24",
+            "qualification": "CTR>5%, 平均观看>40%",
         },
         "TikTok": {
             "title_max_len": 30,
             "hook_time": 2,
             "key_factors": ["完播率", "分享率", "关注率"],
             "content_type": "短视频",
+            "category": "短视频",
             "best_duration": [15, 30, 60],
+            "core_metric": "完播率",
+            "cold_start_hours": "0.5-2",
+            "qualification": "3秒完播>60%, 分享率>1%",
+        },
+        "公众号": {
+            "title_max_len": 64,
+            "hook_time": 0,
+            "key_factors": ["打开率", "分享率", "在看数"],
+            "content_type": "图文",
+            "category": "图文",
+            "best_duration": [],
+            "core_metric": "打开率",
+            "cold_start_hours": "12-48",
+            "qualification": "打开率>5%",
+        },
+        "视频号": {
+            "title_max_len": 30,
+            "hook_time": 3,
+            "key_factors": ["社交传播", "完播率", "点赞率"],
+            "content_type": "短视频",
+            "category": "短视频",
+            "best_duration": [30, 60],
+            "core_metric": "社交传播深度",
+            "cold_start_hours": "4-12",
+            "qualification": "好友分享率>2%",
+        },
+        "百度热搜": {
+            "title_max_len": 40,
+            "hook_time": 0,
+            "key_factors": ["搜索热度", "CTR", "停留时长"],
+            "content_type": "资讯",
+            "category": "资讯",
+            "best_duration": [],
+            "core_metric": "搜索热度",
+            "cold_start_hours": "1-6",
+            "qualification": "关键词匹配>70%",
+        },
+        "Instagram": {
+            "title_max_len": 100,
+            "hook_time": 2,
+            "key_factors": ["Engagement Rate", "Saves", "Shares"],
+            "content_type": "社交",
+            "category": "社交",
+            "best_duration": [15, 30, 60],
+            "core_metric": "互动率",
+            "cold_start_hours": "1-4",
+            "qualification": "Engagement>3%",
         },
     }
 
-    def __init__(self):
-        self.client = DeepSeekClient()
+    # 各平台最佳发布时间
+    
+BEST_POSTING_TIMES: dict[str, list[dict]] = {
+    "抖音": [{"time": "12:00-13:00", "score": 85, "reason": "午休刷屏高峰"}, {"time": "18:00-20:00", "score": 95, "reason": "下班黄金档"}, {"time": "21:00-23:00", "score": 90, "reason": "睡前沉浸时段"}],
+    "小红书": [{"time": "07:00-09:00", "score": 80, "reason": "早间种草"}, {"time": "12:00-14:00", "score": 85, "reason": "午休浏览"}, {"time": "20:00-22:00", "score": 90, "reason": "晚间高峰"}],
+    "B站": [{"time": "12:00-14:00", "score": 80, "reason": "午休浏览"}, {"time": "18:00-20:00", "score": 85, "reason": "放学/下班"}, {"time": "20:00-23:00", "score": 95, "reason": "晚间黄金档"}],
+    "微博": [{"time": "08:00-09:00", "score": 85, "reason": "早高峰刷屏"}, {"time": "12:00-14:00", "score": 80, "reason": "午休热点"}, {"time": "18:00-22:00", "score": 90, "reason": "晚间热搜"}],
+    "知乎": [{"time": "08:00-09:00", "score": 75, "reason": "早间浏览"}, {"time": "12:00-14:00", "score": 80, "reason": "午休阅读"}, {"time": "20:00-22:00", "score": 90, "reason": "晚间深度阅读"}],
+    "头条": [{"time": "07:00-08:00", "score": 85, "reason": "早间资讯"}, {"time": "12:00-13:00", "score": 80, "reason": "午休刷资讯"}, {"time": "18:00-20:00", "score": 90, "reason": "晚间资讯高峰"}],
+    "快手": [{"time": "11:30-13:30", "score": 85, "reason": "午间休息"}, {"time": "19:00-22:00", "score": 90, "reason": "晚间活跃高峰"}],
+    "YouTube": [{"time": "14:00-16:00", "score": 85, "reason": "提前发布抓索引"}, {"time": "09:00-11:00", "score": 80, "reason": "周末上午"}],
+    "TikTok": [{"time": "18:00-21:00", "score": 90, "reason": "目标时区晚间"}, {"time": "12:00-15:00", "score": 80, "reason": "午休浏览"}],
+    "公众号": [{"time": "07:00-08:30", "score": 90, "reason": "上班路上"}, {"time": "11:30-13:00", "score": 80, "reason": "午休浏览"}, {"time": "18:00-20:00", "score": 85, "reason": "下班通勤"}],
+    "视频号": [{"time": "07:00-09:00", "score": 85, "reason": "早间社交"}, {"time": "12:00-13:00", "score": 80, "reason": "午休转发"}, {"time": "18:00-20:00", "score": 90, "reason": "晚间社交链"}],
+    "百度热搜": [{"time": "08:00-10:00", "score": 85, "reason": "早间搜索高峰"}, {"time": "19:00-21:00", "score": 80, "reason": "晚间搜索"}],
+    "Instagram": [{"time": "11:00-13:00", "score": 85, "reason": "午休浏览"}, {"time": "19:00-21:00", "score": 90, "reason": "晚间视觉消费"}],
+}
 
-    def analyze_title_patterns(self, titles: list[dict]) -> dict[str, Any]:
-        """分析标题钩子模式"""
-        pattern_counts = Counter()
-        hook_examples = {}
 
-        for item in titles:
-            title = item.get("title", "")
-            for pattern_name, regex in self.HOOK_PATTERNS.items():
-                if re.search(regex, title):
-                    pattern_counts[pattern_name] += 1
-                    if pattern_name not in hook_examples:
-                        hook_examples[pattern_name] = []
-                    if len(hook_examples[pattern_name]) < 3:
-                        hook_examples[pattern_name].append(title)
+class RuleAnalyzer:
+    """爆款规则分析器"""
 
-        return {
-            "total": len(titles),
-            "patterns": dict(pattern_counts.most_common()),
-            "examples": hook_examples,
-            "hot_keywords": self._extract_hot_keywords(
-                [t.get("title", "") for t in titles]
-            ),
-        }
+    PLATFORM_RULES = {
+        "抖音": {"title_max_len": 30, "hook_time": 3, "key_factors": ["完播率", "点赞率", "评论率", "转发率"], "content_type": "短视频", "category": "短视频", "best_duration": [15, 30, 60], "core_metric": "完播率", "cold_start_hours": "1-3", "qualification": "完播率>45%"},
+        "小红书": {"title_max_len": 20, "hook_time": 1, "key_factors": ["收藏率", "点击率", "评论率"], "content_type": "图文", "category": "种草", "best_duration": [30, 60, 180], "core_metric": "收藏率", "cold_start_hours": "2-6", "qualification": "收藏率>3%"},
+        "B站": {"title_max_len": 30, "hook_time": 30, "key_factors": ["三连率", "弹幕密度", "完播率", "投币率"], "content_type": "中长视频", "category": "中长视频", "best_duration": [300, 600, 1200], "core_metric": "三连率", "cold_start_hours": "6-24", "qualification": "三连率>8%"},
+        "微博": {"title_max_len": 100, "hook_time": 1, "key_factors": ["转发率", "热搜", "互动率"], "content_type": "社交", "category": "社交", "best_duration": [15, 30, 60], "core_metric": "转发量", "cold_start_hours": "0.5-2", "qualification": "转发率>1%"},
+        "知乎": {"title_max_len": 50, "hook_time": 10, "key_factors": ["赞同率", "长尾流量", "专业度"], "content_type": "问答", "category": "问答", "best_duration": [120, 300, 600], "core_metric": "赞同数", "cold_start_hours": "24-72", "qualification": "赞同率>5%"},
+        "头条": {"title_max_len": 28, "hook_time": 3, "key_factors": ["阅读完成率", "评论率", "转发率"], "content_type": "资讯", "category": "资讯", "best_duration": [30, 60, 120], "core_metric": "阅读完成率", "cold_start_hours": "1-4", "qualification": "阅读完成率>50%"},
+        "快手": {"title_max_len": 30, "hook_time": 3, "key_factors": ["互动率", "完播率", "直播转化"], "content_type": "短视频", "category": "短视频", "best_duration": [15, 30, 60], "core_metric": "完播率", "cold_start_hours": "1-2", "qualification": "完播率>35%"},
+        "YouTube": {"title_max_len": 70, "hook_time": 60, "key_factors": ["观看时长", "订阅转化", "完播率"], "content_type": "中长视频", "category": "中长视频", "best_duration": [600, 1200, 2400], "core_metric": "观看时长", "cold_start_hours": "6-24", "qualification": "观看时长>40%"},
+        "TikTok": {"title_max_len": 100, "hook_time": 2, "key_factors": ["完播率", "趋势跟随", "音乐卡点"], "content_type": "短视频", "category": "短视频", "best_duration": [15, 30, 60], "core_metric": "完播率", "cold_start_hours": "0.5-2", "qualification": "完播率>40%"},
+        "公众号": {"title_max_len": 30, "hook_time": 5, "key_factors": ["打开率", "转发率", "阅读完成率"], "content_type": "图文", "category": "图文", "best_duration": [120, 300, 600], "core_metric": "打开率", "cold_start_hours": "12-48", "qualification": "打开率>3%"},
+        "视频号": {"title_max_len": 30, "hook_time": 3, "key_factors": ["转发率", "社交传播", "完播率"], "content_type": "短视频", "category": "短视频", "best_duration": [15, 30, 60], "core_metric": "社交传播", "cold_start_hours": "4-12", "qualification": "转发率>1%"},
+        "百度热搜": {"title_max_len": 30, "hook_time": 1, "key_factors": ["搜索热度", "点击率"], "content_type": "资讯", "category": "资讯", "best_duration": [15, 30, 60], "core_metric": "搜索热度", "cold_start_hours": "1-6", "qualification": "关键词匹配>70%"},
+        "Instagram": {"title_max_len": 100, "hook_time": 2, "key_factors": ["互动率", "收藏", "分享"], "content_type": "社交", "category": "社交", "best_duration": [15, 30, 60], "core_metric": "互动率", "cold_start_hours": "1-4", "qualification": "互动率>3%"},
+    }
 
-    def _extract_hot_keywords(self, titles: list[str]) -> list[str]:
-        """提取热门关键词"""
-        word_counter = Counter()
-        for title in titles:
-            # 简单分词（实际应使用 jieba）
-            words = re.findall(r"[\u4e00-\u9fa5]{2,}", title)
-            word_counter.update(words)
-        return [w for w, _ in word_counter.most_common(20)]
+    @staticmethod
+    def analyze(platform: str, rules: dict | None = None) -> dict:
+        if not rules:
+            return {"error": "no_rules", "platform": platform}
+        return {"platform": platform, "title_rules": rules.get("title_rules", []), "hook_patterns": rules.get("hook_patterns", []), "trending_topics": rules.get("trending_topics", [])[:10], "best_practices": rules.get("best_practices", []), "algorithm": rules.get("algorithm", {})}
 
-    async def generate_platform_rules(
-        self, platform: str, hot_content: list[dict]
-    ) -> dict[str, Any]:
-        """用 AI 分析热门内容，生成平台爆款规则"""
-        platform_config = self.PLATFORM_RULES.get(platform, {})
+    @staticmethod
+    def get_trending_topics(platform: str, titles: list[str] | None = None) -> list[dict]:
+        """获取平台热门话题。
 
-        # 构建分析 prompt
-        titles_text = "\n".join(
-            [
-                f"- {item.get('title', '')} (热度: {item.get('heat', 0)})"
-                for item in hot_content[:15]
-            ]
+        当提供实时采集的标题列表时，通过 jieba 分词实时提取；
+        否则从静态 rules 文件读取（存量数据）。
+
+        Args:
+            platform: 平台名称
+            titles: 可选，实时采集到的标题列表。为空时从 rules 文件读取。
+
+        Returns:
+            热门话题列表，每个话题含 topic/source 字段
+        """
+        from pathlib import Path
+
+        # 有实时数据：分词提取
+        if titles:
+            try:
+                from monitors.parser import HotContentParser
+                topics = HotContentParser.extract_topics(titles)
+                return [{"topic": t, "source": "live", "platform": platform} for t in topics]
+            except Exception:
+                pass
+
+        # 无实时数据：从静态 rules 文件读取
+        rules_path = (
+            Path(__file__).resolve().parent.parent.parent
+            / "data" / "rules" / f"{platform}.json"
         )
+        if rules_path.exists():
+            try:
+                with open(rules_path, "r", encoding="utf-8") as f:
+                    rules = json.load(f)
+                trending = rules.get("trending_topics", [])
+                result = []
+                for t in trending:
+                    if isinstance(t, str):
+                        result.append({"topic": t, "source": "cached", "platform": platform})
+                    elif isinstance(t, dict):
+                        result.append({
+                            "topic": t.get("topic", t.get("title", "")),
+                            "source": t.get("source", "cached"),
+                            "platform": platform,
+                        })
+                return result
+            except Exception:
+                pass
 
-        prompt = f"""分析以下{platform}平台的热门内容，总结爆款规律：
+        return []
 
-热门内容：
-{titles_text}
+    @staticmethod
+    def get_title_suggestions(platform: str, topic: str) -> list[dict]:
+        """基于平台规则生成标题建议。
 
-平台特点：
-- 内容类型：{platform_config.get("content_type", "未知")}
-- 标题最长：{platform_config.get("title_max_len", "未知")}字
-- 关键指标：{", ".join(platform_config.get("key_factors", []))}
+        Args:
+            platform: 平台名称
+            topic: 话题/主题
 
-请输出 JSON 格式的爆款规则：
-{{
-  "title_rules": [
-    {{"rule": "规则描述", "example": "示例标题", "importance": "高/中/低"}}
-  ],
-  "content_rules": [
-    {{"rule": "规则描述", "reason": "原因"}}
-  ],
-  "hook_patterns": [
-    {{"pattern": "钩子类型", "description": "描述", "examples": ["示例1", "示例2"]}}
-  ],
-  "trending_topics": ["热门话题1", "热门话题2"],
-  "best_practices": ["最佳实践1", "最佳实践2"],
-  "avoid_list": ["避坑事项1", "避坑事项2"],
-  "score": {{
-    "hook": 85,
-    "trend": 90,
-    "engagement": 80,
-    "monetization": 75
-  }}
-}}"""
+        Returns:
+            标题建议列表，每个包含 title/hook_type/template
+        """
+        from pathlib import Path
+
+        # 尝试从规则文件读取标题规则作为模板
+        rules_path = (
+            Path(__file__).resolve().parent.parent.parent
+            / "data" / "rules" / f"{platform}.json"
+        )
+        suggestions = []
 
         try:
-            system = f"""{SYSTEM_BASE}
-你是{platform}平台的爆款内容分析专家，精通平台算法和用户行为。
-你需要从热门内容中提炼出可复用的爆款规则。"""
+            with open(rules_path, "r", encoding="utf-8") as f:
+                rules = json.load(f)
+            title_rules = rules.get("title_rules", [])
+            for rule in title_rules[:5]:
+                formula = rule.get("formula", "")
+                suggestions.append({
+                    "title": f"「{topic}」{formula}",
+                    "hook_type": rule.get("type", ""),
+                    "ctr_rating": rule.get("ctr_rating", ""),
+                    "template": formula,
+                })
+        except Exception:
+            pass
 
-            result = await self.client.chat(prompt, system=system)
-            return json.loads(result)
-        except Exception as e:
-            print(f"[Analyzer] AI 分析失败: {e}")
-            return self._get_default_rules(platform)
+        # 无规则文件时使用默认模板
+        if not suggestions:
+            defaults = [
+                {"title": f"3个{topic}方法，最后一个太绝了", "hook_type": "数字型", "ctr_rating": "★★★★☆"},
+                {"title": f"为什么{topic}很重要？看完你就懂了", "hook_type": "悬念型", "ctr_rating": "★★★★☆"},
+                {"title": f"你是不是也遇到了{topic}的困扰？", "hook_type": "痛点型", "ctr_rating": "★★★★☆"},
+                {"title": f"没人告诉你{topic}的真相", "hook_type": "反常识型", "ctr_rating": "★★★★★"},
+                {"title": f"学会{topic}，我的人生变了", "hook_type": "利益型", "ctr_rating": "★★★★☆"},
+            ]
+            suggestions = defaults
 
-    def _get_default_rules(self, platform: str) -> dict:
-        """获取默认规则模板"""
-        return {
-            "title_rules": [
-                {"rule": "标题包含数字", "example": "3个技巧...", "importance": "高"},
-                {
-                    "rule": "制造悬念或好奇心",
-                    "example": "没想到...",
-                    "importance": "高",
-                },
-            ],
-            "content_rules": [
-                {"rule": "前3秒必须有钩子", "reason": "用户注意力短暂"},
-            ],
-            "hook_patterns": [
-                {
-                    "pattern": "数字型",
-                    "description": "用数字吸引眼球",
-                    "examples": ["3个技巧", "99%的人"],
-                },
-            ],
-            "trending_topics": [],
-            "best_practices": ["保持更新频率", "与粉丝互动"],
-            "avoid_list": ["避免违规内容"],
-            "score": {"hook": 70, "trend": 70, "engagement": 70, "monetization": 70},
-        }
+        return suggestions
 
-    def merge_rules(self, platform_rules: dict, title_analysis: dict) -> dict:
-        """合并 AI 规则和统计分析"""
-        return {
-            **platform_rules,
-            "title_analysis": title_analysis,
-            "updated_at": datetime.now().isoformat(),
-        }
+    @staticmethod
+    def get_best_posting_time(platform: str) -> dict:
+        time_slots = RuleAnalyzer.BEST_POSTING_TIMES.get(platform, [])
+        if not time_slots:
+            return {"platform": platform, "time_slots": [], "recommendation": f"暂无{platform}的数据"}
+        best = max(time_slots, key=lambda x: x["score"])
+        return {"platform": platform, "time_slots": time_slots, "recommendation": f"推荐在{best['time']}发布，{best['reason']}"}
+
+    @staticmethod
+    def merge_rules(ai_rules: dict, title_analysis: dict, existing_rules: dict | None = None) -> dict:
+        merged = {"title_rules": ai_rules.get("title_rules") or title_analysis.get("title_rules") or (existing_rules or {}).get("title_rules", []), "hook_patterns": ai_rules.get("hook_patterns") or title_analysis.get("hook_patterns") or (existing_rules or {}).get("hook_patterns", []), "trending_topics": ai_rules.get("trending_topics") or title_analysis.get("trending_topics") or (existing_rules or {}).get("trending_topics", []), "best_practices": ai_rules.get("best_practices") or title_analysis.get("best_practices") or (existing_rules or {}).get("best_practices", []), "algorithm": ai_rules.get("algorithm") or title_analysis.get("algorithm") or (existing_rules or {}).get("algorithm", {})}
+        return merged

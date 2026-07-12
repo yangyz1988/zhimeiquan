@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/toaster";
+import { apiFetch } from "@/lib/api";
 
 const tabs = [
   { id: "cold-start", label: "冷启动", glow: "glow-orange" },
@@ -16,7 +17,7 @@ const tabs = [
 
 type TabId = (typeof tabs)[number]["id"];
 
-const platforms = ["抖音", "小红书", "视频号"];
+const platforms = ["抖音", "小红书", "B站", "快手", "微博", "知乎", "头条", "公众号", "视频号", "百度热搜", "YouTube", "TikTok", "Instagram"];
 
 const summaryCards = [
   { title: "评论区运营", icon: "💬", desc: "引导互动/神评论", glow: "glow-green" },
@@ -173,14 +174,44 @@ export default function OperationsPage() {
   const [keyword, setKeyword] = useState("");
   const [platform, setPlatform] = useState("抖音");
   const [generating, setGenerating] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleGenerate = () => {
-    if (!keyword.trim()) { toast("请输入赛道关键词", "error"); return; }
+  const handleGenerate = async () => {
+    if (!keyword.trim()) { toast.error("请输入赛道关键词"); return; }
     setGenerating(true);
-    setTimeout(() => {
-      toast(`已为"${keyword}"生成${platform}冷启动方案`, "success");
+    setResult(null);
+    setErrorMsg(null);
+    try {
+      const res = await apiFetch<{
+        agentId?: string;
+        taskId?: string;
+        status?: string;
+        message?: string;
+        result?: string;
+        content?: string;
+      }>("/api/agent/start", {
+        method: "POST",
+        body: { keyword: keyword.trim(), platform, task_type: activeTab === "cold-start" ? "cold_start" : activeTab },
+      });
+
+      if (!res.ok) {
+        setErrorMsg(res.error);
+        toast.error(res.error || "Agent 启动失败，请稍后再试");
+        return;
+      }
+
+      const data = res.data;
+      const content = data?.message ?? data?.result ?? data?.content ?? JSON.stringify(data);
+      setResult(content);
+      toast.success(`已为"${keyword}"启动${platform} Agent`);
+    } catch {
+      const msg = "网络错误，请检查连接";
+      setErrorMsg(msg);
+      toast.error(msg);
+    } finally {
       setGenerating(false);
-    }, 1200);
+    }
   };
 
   const activeGlow = tabs.find((t) => t.id === activeTab)?.glow ?? "glow-orange";
@@ -249,10 +280,27 @@ export default function OperationsPage() {
                     ))}
                   </div>
                 </div>
-                <Button onClick={handleGenerate} disabled={generating}
-                  className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600">
-                  {generating ? "生成中..." : "生成冷启动方案"}
+                <Button
+                  onClick={handleGenerate}
+                  disabled={generating}
+                  data-testid="start-agent-button"
+                  className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                >
+                  {generating ? "启动中..." : "启动 Agent"}
                 </Button>
+
+                {errorMsg && (
+                  <div className="mt-4 p-3 rounded-lg border border-red-500/30 bg-red-500/10">
+                    <p className="text-sm text-red-400">{errorMsg}</p>
+                  </div>
+                )}
+
+                {result && (
+                  <div className="mt-4 p-4 rounded-lg border border-orange-500/20 bg-white/[0.03]" data-testid="agent-status">
+                    <h4 className="text-sm font-medium text-orange-400 mb-2">Agent 状态</h4>
+                    <div className="text-sm text-white/70 whitespace-pre-wrap leading-relaxed">{result}</div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

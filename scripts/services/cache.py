@@ -5,7 +5,7 @@ import json
 import os
 import time
 from functools import wraps
-from typing import Any
+from typing import Any, Callable
 
 import redis.asyncio as aioredis
 from services.logging import logger
@@ -17,7 +17,6 @@ class CacheService:
     def __init__(self, url: str | None = None):
         self.url = url or os.getenv("REDIS_URL", "redis://localhost:6379")
         self.client: aioredis.Redis | None = None
-        self.default_ttl = 3600
         self._memory_cache: dict[str, tuple[float, Any]] = {}
         self._redis_checked = False
         self._redis_ok = False
@@ -55,8 +54,7 @@ class CacheService:
             del self._memory_cache[key]
         return None
 
-    def _mem_set(self, key: str, value: Any, ttl: int | None = None):
-        ttl = ttl or self.default_ttl
+    def _mem_set(self, key: str, value: Any, ttl: int):
         self._memory_cache[key] = (time.time() + ttl, value)
         if len(self._memory_cache) > 1000:
             oldest = sorted(self._memory_cache.items(), key=lambda x: x[1][0])[:100]
@@ -84,8 +82,7 @@ class CacheService:
                 self._redis_ok = False
         return self._mem_get(key)
 
-    async def set(self, key: str, value: Any, ttl: int | None = None):
-        ttl = ttl or self.default_ttl
+    async def set(self, key: str, value: Any, ttl: int = 3600):
         serialized = (
             json.dumps(value, ensure_ascii=False)
             if isinstance(value, (dict, list))
@@ -106,12 +103,16 @@ class CacheService:
                 self._redis_ok = False
         self._memory_cache.pop(key, None)
 
-    async def cached(self, prefix: str, data: dict, ttl: int = 3600):
+    async def get_or_compute(self, prefix: str, data: dict, ttl: int, compute_fn: Callable) -> Any:
+        """原子化获取或计算并缓存"""
         key = self._make_key(prefix, data)
         cached = await self.get(key)
         if cached is not None:
             return cached
-        return None
+        result = await compute_fn()
+        if result is not None:
+            await self.set(key, result, ttl=ttl)
+        return result
 
 
 class RateLimiter:
@@ -129,7 +130,6 @@ class RateLimiter:
                 return await self._redis_check(key, limit, window)
             except Exception:
                 self.cache._redis_ok = False
-
         return self._memory_check(key, limit, window)
 
     async def _redis_check(self, key: str, limit: int, window: int) -> tuple[bool, int]:
@@ -176,9 +176,7 @@ def cache_result(prefix: str, ttl: int = 3600):
             if result is not None:
                 await _default_cache.set(key, result, ttl=ttl)
             return result
-
         return wrapper
-
     return decorator
 
 
@@ -190,10 +188,7 @@ def rate_limit(limit: int = 60, window: int = 60, key_func=None):
             allowed, remaining = await _default_limiter.is_allowed(key, limit, window)
             if not allowed:
                 from fastapi import HTTPException
-
                 raise HTTPException(status_code=429, detail="请求过于频繁")
             return await func(*args, **kwargs)
-
         return wrapper
-
     return decorator

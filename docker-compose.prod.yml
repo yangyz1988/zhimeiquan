@@ -17,16 +17,26 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      prisma-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     volumes:
       - saas_data:/app/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 20s
+    networks:
+      - zhimeiquan-net
 
   api:
     build:
@@ -36,11 +46,14 @@ services:
       - "8000:8000"
     environment:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-}
       - QWEN_API_KEY=${QWEN_API_KEY:-}
       - ERNIE_API_KEY=${ERNIE_API_KEY:-}
       - HUNYUAN_API_KEY=${HUNYUAN_API_KEY:-}
+      - SILICONFLOW_API_KEY=${SILICONFLOW_API_KEY:-}
       - REDIS_URL=redis://redis:6379
       - API_SECRET=${API_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL:-https://www.zhimeiquan.com}
       - LOG_FORMAT=json
       - LOG_LEVEL=info
     depends_on:
@@ -48,12 +61,24 @@ services:
         condition: service_healthy
     volumes:
       - api_data:/app/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
-      interval: 30s
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import httpx; r=httpx.get('http://localhost:8000/health', timeout=5); assert r.status_code==200; data=r.json(); assert data.get('status')=='ok'\""
+        ]
+      interval: 15s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 30s
+    networks:
+      - zhimeiquan-net
 
   postgres:
     image: postgres:16-alpine
@@ -63,13 +88,53 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-zhimeiquan}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./deploy/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U zhimeiquan"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - zhimeiquan-net
+
+  prisma-migrate:
+    build:
+      context: ./saas
+      dockerfile: Dockerfile
+      target: builder
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-zhimeiquan}:${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-zhimeiquan}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "npx prisma migrate deploy --schema=./prisma/schema.prisma"
+    restart: "no"
+    networks:
+      - zhimeiquan-net
+
+  postgres-backup:
+    image: postgres:16-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - PGHOST=postgres
+      - PGUSER=${POSTGRES_USER:-zhimeiquan}
+      - PGPASSWORD=${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
+      - PGDATABASE=${POSTGRES_DB:-zhimeiquan}
+      - BACKUP_RETENTION_DAYS=30
+    volumes:
+      - postgres_backup:/backups
+      - ./deploy/postgres/backup.sh:/backup.sh:ro
+    entrypoint: >
+      sh -c "
+        echo '0 3 * * * PGPASSWORD=$PGPASSWORD pg_dump -h postgres -U $${PGUSER} $${PGDATABASE} | gzip > /backups/zhimeiquan_$$(date +\%Y\%m\%d_\%H\%M).sql.gz && find /backups -name '*.sql.gz' -mtime +$${BACKUP_RETENTION_DAYS} -delete' > /etc/crontabs/root &&
+        crond -f -l 2
+      "
+    restart: unless-stopped
+    networks:
+      - zhimeiquan-net
 
   redis:
     image: redis:7-alpine
@@ -83,6 +148,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - zhimeiquan-net
 
   nginx:
     image: nginx:alpine
@@ -95,9 +162,22 @@ services:
       - saas
       - api
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - zhimeiquan-net
 
 volumes:
   saas_data:
   api_data:
   postgres_data:
+  postgres_backup:
   redis_data:
+
+networks:
+  zhimeiquan-net:
+    driver: bridge

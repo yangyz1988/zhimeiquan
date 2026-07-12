@@ -2,10 +2,43 @@
 
 import asyncio
 import time
+from datetime import datetime, timezone
 from functools import wraps
 from typing import Any, Callable
 
+from fastapi.responses import JSONResponse
+
 from services.logging import logger
+
+
+def error_response(
+    status: int,
+    message: str,
+    code: str = "",
+    detail: dict | None = None,
+    headers: dict[str, str] | None = None,
+) -> JSONResponse:
+    """统一错误响应格式
+
+    返回格式:
+        {
+            "error": {"code": "...", "message": "..."},
+            "meta": {"timestamp": "2026-07-05T..."}
+        }
+    """
+    body: dict[str, Any] = {
+        "error": {
+            "code": code or "error",
+            "message": message,
+        },
+        "meta": {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    }
+    if detail:
+        body["error"]["detail"] = detail
+
+    return JSONResponse(status_code=status, content=body, headers=headers)
 
 
 class ServiceError(Exception):

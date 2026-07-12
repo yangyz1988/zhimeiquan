@@ -1,0 +1,42 @@
+# Node.js
+node_modules/
+.next/
+.turbo/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Data
+data/
+output/
+*.db
+*.db-journal
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Git
+.git/
+
+# IDE
+.vscode/
+.idea/
+
+# Secrets
+.env
+.env.*
+!env.example
+
+# Tests
+coverage/
+playwright-report/
+test-results/
+
+# OS
+.DS_Store
+Thumbs.db

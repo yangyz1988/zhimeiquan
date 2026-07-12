@@ -3,6 +3,22 @@ generator client {
 }
 
 datasource db {
+  // ==========================================
+  // 开发环境 (默认) — SQLite
+  //   DATABASE_URL="file:./dev.db"
+  //   provider  = "sqlite"
+  //
+  // 生产环境 — PostgreSQL
+  //   DATABASE_URL="postgresql://user:pass@host:5432/zhimeiquan?schema=public"
+  //   provider  = "postgresql"
+  //
+  // 切换步骤:
+  //   1. 修改下面 provider = "postgresql"
+  //   2. 设置环境变量 DATABASE_URL 指向 PostgreSQL 实例
+  //   3. 运行: pnpm db:push (新库) 或 pnpm db:migrate (增量迁移)
+  //   4. 建议使用 connection_limit=5 防止 serverless 连接溢出
+  // ==========================================
+
   provider = "sqlite"
   url      = env("DATABASE_URL")
 }
@@ -33,7 +49,6 @@ model User {
   schedules              Schedule[]
   agentSessions          AgentSession[]
   abTests                AbTest[]
-  abTestParticipants     AbTestParticipant[]
   teamMembers            TeamMember[]
   webhooks               Webhook[]
   integrations           Integration[]
@@ -42,7 +57,8 @@ model User {
   usageMetrics           UsageMetric[]
   insights               Insight[]
   promptCacheEntries     PromptCacheEntry[]
-  agentRuns              AgentRun[]
+  contentTemplates       ContentTemplate[]
+  analytics              Analytics[]
 }
 
 enum PlanTier {
@@ -105,9 +121,12 @@ model ContentOutput {
 
   projectId   String
   project     Project       @relation(fields: [projectId], references: [id])
+  userId      String?
+  user        User?         @relation(fields: [userId], references: [id])
   versions    ContentVersion[]
 
   @@index([projectId])
+  @@index([userId])
 }
 
 enum ContentOutputType {
@@ -175,7 +194,7 @@ model ContentTemplate {
   description String?
   platform    String?
   type        String          // article, video_script, social_post, ...
-  structure   Json!           // outline / section definitions
+  structure   Json            // outline / section definitions
   prompt      String          // template prompt for generation
   variables   Json?           // list of placeholders like {{topic}}, {{audience}}
   isPublic    Boolean  @default(false)
@@ -249,9 +268,13 @@ model Analytics {
   revenue     Float?
   collectedAt DateTime @default(now())
 
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id])
+
   @@unique([platform, entityId, collectedAt])
   @@index([entityId])
   @@index([platform, collectedAt])
+  @@index([userId])
 }
 
 // ---------------------------------------------------------------------------
@@ -293,7 +316,7 @@ model AgentSession {
   id          String         @id @default(cuid())
   name        String
   agentId     String?
-  config      Json!          // agent behaviour config
+  config      Json           // agent behaviour config
   status      AgentStatus    @default(RUNNING)
   result      Json?          // final output / summary
   errorMessage String?
@@ -347,8 +370,8 @@ model AbTest {
   id          String   @id @default(cuid())
   name        String
   description String?
-  variantA    Json!    // variant A content / config
-  variantB    Json!    // variant B content / config
+  variantA    Json     // variant A content / config
+  variantB    Json     // variant B content / config
   metric      String   // views, engagement, conversion, ...
   targetSize  Int      @default(100)
   status      AbTestStatus @default(RUNNING)
@@ -423,7 +446,7 @@ model UserPlan {
   price       Float
   currency    String   @default("USD")
   interval    PlanInterval
-  features    Json!           // feature flags and limits
+  features    Json            // feature flags and limits
   maxCredits  Int?
   maxProjects Int?
   maxAgents   Int?
@@ -465,7 +488,7 @@ model Integration {
   id          String   @id @default(cuid())
   provider    String        // zapier, make, n8n, custom
   name        String
-  config      Json!         // provider-specific connection config
+  config      Json          // provider-specific connection config
   isActive    Boolean  @default(true)
   lastSyncAt  DateTime?
   createdAt   DateTime @default(now())
@@ -597,7 +620,7 @@ model PromptCacheEntry {
   id          String   @id @default(cuid())
   promptHash  String    // hash of the input prompt
   prompt      String
-  result      Json!
+  result      Json
   ttl         Int       // seconds until expiration
   expiresAt   DateTime
   createdAt   DateTime @default(now())

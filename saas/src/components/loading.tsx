@@ -18,7 +18,7 @@ export function Loading({ message = "加载中...", size = "md", fullPage = fals
   const container = (
     <div className="flex flex-col items-center justify-center gap-2 py-8">
       <Loader2 className={`${sizeClass} animate-spin text-orange-500`} />
-      <p className="text-sm text-muted-foreground">{message}</p>
+      <p className="text-sm text-white/50">{message}</p>
     </div>
   );
 
@@ -33,12 +33,16 @@ export function Loading({ message = "加载中...", size = "md", fullPage = fals
   return container;
 }
 
+/**
+ * @deprecated 请使用 @/components/skeleton 中的 Skeleton 组件
+ * 保留此组件以确保向后兼容
+ */
 export function SkeletonCard() {
   return (
     <div className="space-y-3">
-      <div className="h-4 w-3/4 animate-pulse rounded bg-secondary" />
-      <div className="h-4 w-1/2 animate-pulse rounded bg-secondary" />
-      <div className="h-4 w-5/6 animate-pulse rounded bg-secondary" />
+      <div className="h-4 w-3/4 animate-pulse rounded bg-white/10" />
+      <div className="h-4 w-1/2 animate-pulse rounded bg-white/10" />
+      <div className="h-4 w-5/6 animate-pulse rounded bg-white/10" />
     </div>
   );
 }

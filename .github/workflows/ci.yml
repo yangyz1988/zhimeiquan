@@ -29,6 +29,18 @@ jobs:
         working-directory: ./saas
         run: pnpm install --frozen-lockfile
 
+      - name: Run ESLint
+        working-directory: ./saas
+        run: pnpm lint
+
+      - name: Run TypeScript type check
+        working-directory: ./saas
+        run: pnpm exec tsc --noEmit
+
+      - name: Run unit tests with coverage
+        working-directory: ./saas
+        run: pnpm test:coverage
+
       - name: Build Next.js
         working-directory: ./saas
         run: pnpm build
@@ -58,4 +70,5 @@ jobs:
           sleep 10
           curl -f http://localhost:3000 || exit 1
           curl -f http://localhost:8000/health || exit 1
+          curl -f http://localhost:8000/ready || exit 1
           docker compose down

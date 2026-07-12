@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/toaster";
+import { apiFetch } from "@/lib/api";
 
-const platforms = ["抖音", "小红书", "B站"];
+const platforms = ["抖音", "小红书", "B站", "快手", "微博", "知乎", "头条", "公众号", "视频号", "百度热搜", "YouTube", "TikTok", "Instagram"];
 const counts = ["5", "10", "20"];
 const styles = ["悬念式", "数字式", "痛点式", "反常识", "对比式", "故事式"];
 
@@ -35,31 +36,29 @@ export default function ToolsPage() {
     );
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!topic.trim()) { toast("请输入话题", "error"); return; }
     setGenerating(true);
-    fetch("/api/titles/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic, platform: selectedPlatform, count: Number(selectedCount), style: selectedStyles }),
-    })
-      .then(async (res) => {
-        const data = await res.json();
-        if (data.titles) {
-          setTitleResults(data.titles);
-          toast("标题生成成功", "success");
-        } else {
-          const demo = Array.from({ length: Number(selectedCount) }, (_, i) => `【${selectedStyles[0] ?? "悬念式"}】${topic}的${i + 1}个爆款标题`);
-          setTitleResults(demo);
-          toast("已生成演示标题（API未连接）", "success");
-        }
-      })
-      .catch(() => {
+    try {
+      const result = await apiFetch<{ titles?: string[] }>("/api/titles/generate", {
+        method: "POST",
+        body: { topic, platform: selectedPlatform, count: Number(selectedCount), style: selectedStyles },
+      });
+      if (result.ok && result.data?.titles) {
+        setTitleResults(result.data.titles);
+        toast("标题生成成功", "success");
+      } else {
         const demo = Array.from({ length: Number(selectedCount) }, (_, i) => `【${selectedStyles[0] ?? "悬念式"}】${topic}的${i + 1}个爆款标题`);
         setTitleResults(demo);
-        toast("已生成演示标题（API未连接）", "success");
-      })
-      .finally(() => setGenerating(false));
+        toast(result.ok ? "已生成演示标题（API未连接）" : (result.error || "请求失败"), result.ok ? "success" : "error");
+      }
+    } catch {
+      const demo = Array.from({ length: Number(selectedCount) }, (_, i) => `【${selectedStyles[0] ?? "悬念式"}】${topic}的${i + 1}个爆款标题`);
+      setTitleResults(demo);
+      toast("已生成演示标题（API未连接）", "success");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleScore = () => {
@@ -139,7 +138,7 @@ export default function ToolsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-white/70">平台</label>
-                  <div className="flex gap-1.5">
+                  <div className="flex flex-wrap gap-1.5">
                     {platforms.map((p) => (
                       <Badge key={p} variant={selectedPlatform === p ? "default" : "outline"}
                         className={`cursor-pointer text-xs ${
@@ -222,19 +221,15 @@ export default function ToolsPage() {
 
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-white/70">目标平台</label>
-                <div className="flex gap-2">
-                  <Badge variant={scorePlatform === "抖音" ? "default" : "outline"}
-                    className={`cursor-pointer ${
-                      scorePlatform === "抖音" ? "bg-blue-500/80 text-white" : "border-white/15 text-white/50 hover:bg-white/10"
-                    }`}
-                    onClick={() => setScorePlatform("抖音")}
-                  >抖音(完播率导向)</Badge>
-                  <Badge variant={scorePlatform === "小红书" ? "default" : "outline"}
-                    className={`cursor-pointer ${
-                      scorePlatform === "小红书" ? "bg-blue-500/80 text-white" : "border-white/15 text-white/50 hover:bg-white/10"
-                    }`}
-                    onClick={() => setScorePlatform("小红书")}
-                  >小红书(收藏率导向)</Badge>
+                <div className="flex flex-wrap gap-1.5">
+                  {platforms.map((p) => (
+                    <Badge key={p} variant={scorePlatform === p ? "default" : "outline"}
+                      className={`cursor-pointer text-xs ${
+                        scorePlatform === p ? "bg-blue-500/80 text-white" : "border-white/15 text-white/50 hover:bg-white/10"
+                      }`}
+                      onClick={() => setScorePlatform(p)}
+                    >{p}</Badge>
+                  ))}
                 </div>
               </div>
 

@@ -7,8 +7,8 @@ Write-Host "==================================" -ForegroundColor Cyan
 
 # 检查 Python
 try {
-     = python --version 2>&1
-    Write-Host "[OK] Python: " -ForegroundColor Green
+    $result = $(python --version 2>&1)
+    Write-Host "[OK] Python: $result" -ForegroundColor Green
 } catch {
     Write-Host "[ERROR] 请先安装 Python 3.10+" -ForegroundColor Red
     exit 1
@@ -16,8 +16,8 @@ try {
 
 # 检查 Node.js
 try {
-     = node --version 2>&1
-    Write-Host "[OK] Node.js: " -ForegroundColor Green
+    $result = $(node --version 2>&1)
+    Write-Host "[OK] Node.js: $result" -ForegroundColor Green
 } catch {
     Write-Host "[ERROR] 请先安装 Node.js 18+" -ForegroundColor Red
     exit 1

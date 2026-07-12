@@ -37,7 +37,7 @@ export async function PUT(
 
   const project = await prisma.project.updateMany({
     where: { id, userId },
-    data: { name, topic, platform, persona, duration },
+    data: { name, topic, platforms: platform ? [platform] : [], persona, duration },
   });
 
   return NextResponse.json(project);

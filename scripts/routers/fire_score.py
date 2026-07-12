@@ -40,7 +40,24 @@ class WeightResponse(BaseModel):
 
 @router.post("/report")
 async def report_performance(req: PerformanceReportRequest):
-    """用户上报发布后数据，触发 Fire Score 校准"""
+    """用户上报发布后数据，触发 Fire Score 校准
+
+    数据流：
+    1. 先创建发布记录 (record_publish)
+    2. 再更新指标数据 (update_metrics)
+    3. 最后触发校准 (calibrator)
+    """
+    # 第一步：创建发布记录
+    tracker.record_publish(
+        content_id=req.content_id,
+        user_id=req.user_id,
+        platform=req.platform,
+        title="",
+        fire_score=req.fire_score,
+        dimension_scores=req.dimension_scores,
+    )
+
+    # 第二步：更新指标数据
     record = tracker.update_metrics(
         req.content_id,
         {
@@ -52,26 +69,7 @@ async def report_performance(req: PerformanceReportRequest):
         },
     )
 
-    if "error" in record:
-        tracker.record_publish(
-            req.content_id,
-            req.user_id,
-            req.platform,
-            title="",
-            fire_score=req.fire_score,
-            dimension_scores=req.dimension_scores,
-        )
-        tracker.update_metrics(
-            req.content_id,
-            {
-                "views": req.views,
-                "likes": req.likes,
-                "comments": req.comments,
-                "shares": req.shares,
-                "favorites": req.favorites,
-            },
-        )
-
+    # 第三步：记录到校准器
     calibrator.record_performance(
         req.content_id,
         req.user_id,
@@ -87,6 +85,7 @@ async def report_performance(req: PerformanceReportRequest):
         },
     )
 
+    # 第四步：运行校准
     result = calibrator.calibrate(req.user_id, req.platform)
 
     return {

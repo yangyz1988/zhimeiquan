@@ -1,8 +1,63 @@
 import json
+from pathlib import Path
 
 from .content_loader import get_methodology, get_persona, get_template
 
 SYSTEM_BASE = "你是智媒圈AI助手，专业的自媒体内容创作专家。请用中文回复。"
+
+# 平台规则目录（动态注入）
+RULES_DIR = Path(__file__).resolve().parents[2] / "data" / "rules"
+
+
+def _load_platform_rules(platform: str) -> dict | None:
+    """从 data/rules/{platform}.json 加载平台规则。"""
+    filepath = RULES_DIR / f"{platform}.json"
+    if not filepath.exists():
+        return None
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def _get_platform_traits(platform: str, rules: dict | None = None) -> str:
+    """根据平台规则动态生成平台特点描述。"""
+    if rules:
+        # 从规则文件提取核心信息
+        algo = rules.get("algorithm", {})
+        core_metric = algo.get("core_metric", "互动率")
+        cold_start = algo.get("cold_start_window_hours", "未知")
+        title_rules = rules.get("title_rules", [])
+        hook_patterns = rules.get("hook_patterns", [])
+
+        traits = f"- 核心指标：{core_metric}\n"
+        traits += f"- 冷启动窗口：{cold_start}\n"
+        if title_rules:
+            top_rules = title_rules[:3]
+            traits += "- 高效标题模式：" + "、".join(r.get("type", r.get("rule", "")) for r in top_rules) + "\n"
+        if hook_patterns:
+            top_hooks = hook_patterns[:3]
+            traits += "- 热门钩子：" + "、".join(h.get("type", h.get("pattern", "")) for h in top_hooks) + "\n"
+        return traits
+
+    # fallback：硬编码的基本特点（仅当规则文件不存在时使用）
+    fallback_traits = {
+        "抖音": "- 节奏快，前3秒必须有钩子，完播率是核心\n",
+        "小红书": "- 干货+情绪，标题要有数字，收藏率权重高\n",
+        "B站": "- 深度内容，弹幕互动，三连率是关键\n",
+        "快手": "- 接地气，老铁文化，完播率+互动率\n",
+        "微博": "- 热点蹭热搜，转发量核心，140字配图\n",
+        "知乎": "- 深度问答，收藏/赞比，长文结构化\n",
+        "头条": "- 阅读完成率核心，CTR驱动，信息密度\n",
+        "公众号": "- 打开率核心，深度长文，固定推送时间\n",
+        "视频号": "- 社交裂变核心，转发率>完播率\n",
+        "百度热搜": "- 搜索热度匹配，关键词布局\n",
+        "YouTube": "- 国际化视角，SEO友好，观看时长核心\n",
+        "TikTok": "- 全球化，趋势敏感，前2秒定成败\n",
+        "Instagram": "- 视觉消费，互动率核心，Stories+Reels\n",
+    }
+    return fallback_traits.get(platform, "- 通用平台规则\n")
 
 
 class Prompts:
@@ -14,15 +69,17 @@ class Prompts:
         duration: int,
         rules: dict | None = None,
     ) -> tuple[str, str]:
+        # 动态加载平台规则
+        if rules is None:
+            rules = _load_platform_rules(platform)
+
+        platform_traits = _get_platform_traits(platform, rules)
+
         system = f"""{SYSTEM_BASE}
 你擅长为不同平台创作口播内容。
-平台特点：
-- 抖音：节奏快，前3秒必须有钩子，时长短
-- 小红书：干货+情绪，标题要有数字
-- B站：深度内容，可以长视频
-- 公众号：深度长文，逻辑清晰
-- YouTube：国际化视角，SEO友好
-- TikTok：全球化，趋势敏感"""
+
+## {platform} 平台特点（来自实时规则库）
+{platform_traits}"""
 
         template = get_template(platform)
         if template:
@@ -37,7 +94,14 @@ class Prompts:
             system += f"\n\n## 钩子力方法论（Fire Score 维度 1 · 权重 25%）\n{hook_doc}"
 
         if rules:
-            rules_text = json.dumps(rules, ensure_ascii=False, indent=2)
+            # 只注入关键字段，避免 prompt 过长
+            compact_rules = {
+                "title_rules": rules.get("title_rules", [])[:5],
+                "hook_patterns": rules.get("hook_patterns", [])[:5],
+                "algorithm": rules.get("algorithm", {}),
+                "trending_topics": rules.get("trending_topics", [])[:10],
+            }
+            rules_text = json.dumps(compact_rules, ensure_ascii=False, indent=2)
             system += f"\n\n当前{platform}平台爆款规则（实时更新）：\n{rules_text}"
 
         prompt = f"""请为以下主题生成口播内容：
@@ -61,8 +125,19 @@ class Prompts:
     def generate_titles(
         topic: str, platform: str, count: int = 5, rules: dict | None = None
     ) -> tuple[str, str]:
+        # 动态加载平台规则
+        if rules is None:
+            rules = _load_platform_rules(platform)
+
+        platform_traits = _get_platform_traits(platform, rules)
+
         system = f"""{SYSTEM_BASE}
-你擅长创作爆款标题。好标题的特点：
+你擅长创作爆款标题。
+
+## {platform} 平台标题特点
+{platform_traits}
+
+好标题的特点：
 - 有数字（3个、5招、99%）
 - 有悬念或反常识
 - 有情绪共鸣
@@ -77,7 +152,11 @@ class Prompts:
             system += f"\n\n## 钩子力方法论（Fire Score 维度 1 · 权重 25%）\n{hook_doc}"
 
         if rules:
-            rules_text = json.dumps(rules, ensure_ascii=False, indent=2)
+            compact_rules = {
+                "title_rules": rules.get("title_rules", [])[:5],
+                "hook_patterns": rules.get("hook_patterns", [])[:5],
+            }
+            rules_text = json.dumps(compact_rules, ensure_ascii=False, indent=2)
             system += f"\n\n当前{platform}平台爆款规则（实时更新）：\n{rules_text}"
 
         prompt = f"""为以下主题生成{count}个爆款标题：
@@ -88,7 +167,7 @@ class Prompts:
 请按以下格式输出（JSON）：
 {{
   "titles": [
-    {{"title": "标题", "score": 95, "reason": "评分理由", "hook_type": "钩子类型"}}
+    {{ "title": "标题", "score": 95, "reason": "评分理由", "hook_type": "钩子类型" }}
   ]
 }}
 
@@ -99,6 +178,10 @@ class Prompts:
     def score_content(
         title: str, body: str, platform: str, rules: dict | None = None
     ) -> tuple[str, str]:
+        # 动态加载平台规则
+        if rules is None:
+            rules = _load_platform_rules(platform)
+
         system = f"""{SYSTEM_BASE}
 你是Fire Score评分专家，从5个维度评估内容质量：
 1. 钩子力(25%)：前3秒能否让人停住
@@ -120,8 +203,9 @@ class Prompts:
                 system += f"\n\n## Fire Score · {dim} 维度评分标准（来自知识库）\n{doc}"
 
         if rules:
-            rules_text = json.dumps(rules, ensure_ascii=False, indent=2)
-            system += f"\n\n当前{platform}平台爆款规则（实时更新）：\n{rules_text}"
+            algo = rules.get("algorithm", {})
+            if algo:
+                system += f"\n\n## {platform} 平台算法参数\n{json.dumps(algo, ensure_ascii=False, indent=2)}"
 
         prompt = f"""请对以下内容进行Fire Score评分：
 

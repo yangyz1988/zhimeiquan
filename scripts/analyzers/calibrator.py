@@ -255,6 +255,208 @@ class FireScoreCalibrator:
         )
         return round(weighted_sum / 100, 4)
 
+    def get_calibration_report(self, user_id: str, platform: str) -> dict:
+        """返回人类可读的校准报告
+
+        包含权重变化历史、相关性分析、数据质量评估和建议。
+        """
+        # 获取当前权重
+        current_weights = self.get_calibrated_weights(user_id, platform)
+
+        # 获取相关性和样本信息
+        calibrate_result = self.calibrate(user_id, platform)
+        weights = calibrate_result.get("weights", current_weights)
+        correlations = calibrate_result.get("correlations", {})
+        sample_count = calibrate_result.get("sample_count", 0)
+
+        # 获取历史数据
+        history = self.get_history(user_id, platform, limit=WINDOW_SIZE)
+
+        # 计算与默认权重的偏差
+        deviations = {}
+        for dim in DIMENSIONS:
+            default_val = DEFAULT_WEIGHTS[dim]
+            current_val = weights.get(dim, default_val)
+            pct_change = ((current_val - default_val) / default_val) * 100
+            deviations[dim] = round(pct_change, 1)
+
+        # 数据质量评分
+        if sample_count < MIN_SAMPLES:
+            quality = "insufficient"
+            quality_msg = f"数据不足，至少需要 {MIN_SAMPLES} 条样本，当前 {sample_count} 条"
+        elif sample_count < 20:
+            quality = "low"
+            quality_msg = f"样本量较低 ({sample_count})，校准结果可能不稳定"
+        elif sample_count < 50:
+            quality = "medium"
+            quality_msg = f"样本量适中 ({sample_count})，校准结果可信"
+        else:
+            quality = "high"
+            quality_msg = f"样本量充足 ({sample_count})，校准结果高度可信"
+
+        # 分析最强/最弱维度
+        corr_sorted = sorted(correlations.items(), key=lambda x: x[1], reverse=True) if correlations else []
+        strongest_dim = corr_sorted[0][0] if corr_sorted else None
+        strongest_corr = corr_sorted[0][1] if corr_sorted else 0.0
+        weakest_dim = corr_sorted[-1][0] if len(corr_sorted) > 1 else None
+        weakest_corr = corr_sorted[-1][1] if len(corr_sorted) > 1 else 0.0
+
+        # 分析互动率趋势
+        engagement_trend = "stable"
+        if len(history) >= 10:
+            recent = [h["engagement_rate"] for h in history[:5] if h["engagement_rate"] is not None]
+            earlier = [h["engagement_rate"] for h in history[-5:] if h["engagement_rate"] is not None]
+            if recent and earlier:
+                avg_recent = sum(recent) / len(recent)
+                avg_earlier = sum(earlier) / len(earlier)
+                if avg_recent > avg_earlier * 1.1:
+                    engagement_trend = "rising"
+                elif avg_recent < avg_earlier * 0.9:
+                    engagement_trend = "declining"
+
+        # 生成建议
+        recommendations = []
+        if quality == "low" or quality == "insufficient":
+            recommendations.append("增加内容发布量以获得更稳定的校准结果")
+        if deviations.get("hook", 0) > 10:
+            recommendations.append(f"钩子维度权重偏离默认值 {deviations['hook']}%，建议关注钩子设计优化")
+        if deviations.get("retention", 0) > 10:
+            recommendations.append(f"留存维度权重偏离默认值 {deviations['retention']}%，建议优化内容结构")
+        if strongest_dim:
+            recommendations.append(f"最强预测维度: {strongest_dim} (相关系数 {round(strongest_corr, 3)})")
+        if engagement_trend == "declining":
+            recommendations.append("互动率呈下降趋势，建议尝试新的内容策略")
+
+        report = {
+            "user_id": user_id,
+            "platform": platform,
+            "generated_at": datetime.now().isoformat(),
+            "summary": {
+                "status": calibrate_result.get("status", "unknown"),
+                "sample_count": sample_count,
+                "data_quality": quality,
+                "quality_message": quality_msg,
+                "engagement_trend": engagement_trend,
+            },
+            "weights": {
+                "current": weights,
+                "default": DEFAULT_WEIGHTS,
+                "deviations_pct": deviations,
+            },
+            "correlations": {d: round(v, 4) for d, v in correlations.items()},
+            "strongest_dimension": {
+                "name": strongest_dim,
+                "correlation": round(strongest_corr, 4),
+            } if strongest_dim else None,
+            "weakest_dimension": {
+                "name": weakest_dim,
+                "correlation": round(weakest_corr, 4),
+            } if weakest_dim else None,
+            "recommendations": recommendations,
+        }
+        return report
+
+    def calibrate_from_history(self, user_id: str, platform: str) -> dict:
+        """使用 ALL 历史数据（不限于滑动窗口）进行校准
+
+        与 calibrate() 的区别：
+        - 使用全量历史数据而非最近 WINDOW_SIZE 条
+        - 应用权重稳定性检查：新权重与默认权重偏差 >15% 时自动封顶
+        """
+        rows = self.conn.execute(
+            """SELECT hook_score, trust_score, retention_score,
+                      conversion_score, emotion_score, engagement_rate
+               FROM performance_records
+               WHERE user_id = ? AND platform = ?
+                 AND hook_score IS NOT NULL
+               ORDER BY created_at DESC""",
+            (user_id, platform),
+        ).fetchall()
+
+        all_count = len(rows)
+
+        if all_count < MIN_SAMPLES:
+            default = self._upsert_weights(user_id, platform, DEFAULT_WEIGHTS, all_count)
+            return {
+                "status": "insufficient_data",
+                "message": f"至少需要 {MIN_SAMPLES} 条数据才能校准，当前 {all_count} 条",
+                "weights": default,
+                "sample_count": all_count,
+                "history_used": "all",
+            }
+
+        dim_values: dict[str, list[float]] = {d: [] for d in DIMENSIONS}
+        engagement_values: list[float] = []
+
+        for row in rows:
+            dim_values["hook"].append(row["hook_score"])
+            dim_values["trust"].append(row["trust_score"])
+            dim_values["retention"].append(row["retention_score"])
+            dim_values["conversion"].append(row["conversion_score"])
+            dim_values["emotion"].append(row["emotion_score"])
+            engagement_values.append(row["engagement_rate"])
+
+        correlations: dict[str, float] = {}
+        for dim in DIMENSIONS:
+            correlations[dim] = abs(_pearson(dim_values[dim], engagement_values))
+
+        total_corr = sum(correlations.values())
+        if total_corr < 1e-9:
+            raw_weights = DEFAULT_WEIGHTS.copy()
+        else:
+            raw_weights = {
+                dim: round((correlations[dim] / total_corr) * 100, 1)
+                for dim in DIMENSIONS
+            }
+
+        # 应用权重稳定性检查：偏差超过 15% 则封顶
+        capped_weights = {}
+        caps_applied = []
+        for dim in DIMENSIONS:
+            raw_val = raw_weights.get(dim, DEFAULT_WEIGHTS[dim])
+            default_val = DEFAULT_WEIGHTS[dim]
+            if default_val > 0:
+                deviation = abs(raw_val - default_val) / default_val
+                if deviation > 0.15:
+                    diff = raw_val - default_val
+                    capped = default_val + (1.0 if diff > 0 else -1.0) * default_val * 0.15
+                    capped_weights[dim] = round(capped, 1)
+                    caps_applied.append({
+                        "dimension": dim,
+                        "raw_value": raw_val,
+                        "default_value": default_val,
+                        "capped_value": round(capped, 1),
+                        "deviation_pct": round(deviation * 100, 1),
+                    })
+                else:
+                    capped_weights[dim] = raw_val
+            else:
+                capped_weights[dim] = raw_val
+
+        # 确保权重总和为 100%
+        total = sum(capped_weights.values())
+        if abs(total - 100.0) > 0.1:
+            capped_weights = {d: round(v / total * 100, 1) for d, v in capped_weights.items()}
+
+        saved = self._upsert_weights(user_id, platform, capped_weights, all_count)
+
+        result = {
+            "status": "calibrated",
+            "method": "full_history_with_stability_check",
+            "weights": saved,
+            "raw_weights_before_cap": raw_weights,
+            "correlations": {d: round(v, 4) for d, v in correlations.items()},
+            "sample_count": all_count,
+            "history_used": "all",
+            "stability_check": {
+                "threshold_pct": 15.0,
+                "caps_applied": len(caps_applied),
+                "capped_dimensions": caps_applied,
+            },
+            "calibrated_at": datetime.now().isoformat(),
+        }
+        return result
+
     def get_history(
         self, user_id: str, platform: str, limit: int = 50
     ) -> list[dict[str, Any]]:

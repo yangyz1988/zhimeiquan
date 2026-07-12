@@ -119,6 +119,9 @@
   body {
     @apply bg-background text-foreground;
   }
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 /* ============================================================
@@ -256,5 +259,55 @@
     background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%);
     background-size: 200% 100%;
     animation: shimmer 3s infinite;
+  }
+  /* Toast 右侧滑入 */
+  @keyframes slide-in-from-right {
+    0% { transform: translateX(100%); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+  }
+  .animate-in {
+    animation: slide-in-from-right 0.3s ease-out;
+  }
+  .slide-in-from-right {
+    animation: slide-in-from-right 0.3s ease-out;
+  }
+}
+
+/* 滚动条样式 */
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.2);
+  }
+}
+
+/* iOS safe area */
+@layer utilities {
+  .pb-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* Mobile responsive enhancements */
+@layer utilities {
+  /* Prevent iOS tap highlight */
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Container responsive padding */
+  .container-mobile {
+    @apply px-4 sm:px-6 lg:px-8;
   }
 }

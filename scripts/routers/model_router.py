@@ -1,7 +1,7 @@
 """模型路由 API"""
 
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, Query
+from pydantic import BaseModel, Field
 
 from services.router import default_router, TaskType, MODEL_PROFILES
 
@@ -41,6 +41,7 @@ async def list_profiles():
             "cost_per_1k": p.cost_per_1k_tokens,
             "avg_latency_ms": p.avg_latency_ms,
             "quality": p.quality_score,
+            "max_tokens": p.max_tokens,
             "best_for": [t.value for t in p.best_for],
         }
         for name, p in MODEL_PROFILES.items()
@@ -62,4 +63,32 @@ async def recommend_model(
         task = TaskType(task_type)
     except ValueError:
         task = TaskType.CONTENT_GENERATION
-    return {"recommended": default_router.select_model(task, priority)}
+
+    # 尝试学习推荐，否则静态推荐
+    optimal = default_router.get_optimal_model(task, priority)
+    if optimal:
+        return {"recommended": optimal, "source": "learned"}
+    return {"recommended": default_router.select_model(task, priority), "source": "static"}
+
+
+@router.get("/performance")
+async def get_performance(model_name: str | None = None):
+    """获取模型性能统计（基于历史数据）"""
+    return default_router.get_model_performance(model_name)
+
+
+@router.post("/cost-estimate")
+async def cost_estimate(
+    prompt: str = Query(..., min_length=1),
+    model_name: str = Query("deepseek"),
+    output_tokens: int = Query(500, ge=1),
+):
+    """估算一次调用的成本"""
+    cost = default_router.estimate_cost(prompt, model_name, output_tokens)
+    profile = MODEL_PROFILES.get(model_name)
+    return {
+        "estimated_cost": cost,
+        "model_name": model_name,
+        "model_display": profile.name if profile else model_name,
+        "output_tokens": output_tokens,
+    }

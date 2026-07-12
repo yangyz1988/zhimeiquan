@@ -47,6 +47,29 @@ class DataTracker:
 
         return record
 
+    def register_content(
+        self,
+        project_id: str,
+        platform: str,
+        title: str,
+        content_id: str,
+        fire_score: float | None = None,
+    ) -> dict:
+        """注册内容追踪 — 在内容生成阶段调用，metrics 初始为 0。
+
+        与 record_publish 的区别：record_publish 在发布时调用，
+        register_content 在内容生成时就预注册，用于追踪生成→发布
+        之间的 Fire Score 预测值，后续通过 update_metrics 回流实
+        际数据，通过 feedback 端点对比校准。
+        """
+        return self.record_publish(
+            project_id=project_id,
+            platform=platform,
+            title=title,
+            content_id=content_id,
+            fire_score=fire_score,
+        )
+
     def update_metrics(self, project_id: str, content_id: str, metrics: dict) -> dict:
         """更新内容表现数据"""
         filepath = self.data_dir / f"{project_id}_{content_id}.json"

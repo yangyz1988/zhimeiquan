@@ -27,7 +27,7 @@ export async function POST(
       title: body.title,
       body: body.body,
       script: body.script,
-      tags: body.tags ? JSON.stringify(body.tags) : null,
+      tags: body.tags ?? undefined,
       fireScore: body.fireScore ?? null,
       level: body.level,
     },

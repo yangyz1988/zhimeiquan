@@ -15,4 +15,7 @@ from . import (
     team,
     model_router,
     insights,
+    competitors,
+    stream,
+    payment,
 )

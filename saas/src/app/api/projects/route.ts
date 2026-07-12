@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     data: {
       name,
       topic,
-      platform,
+      platforms: platform ? [platform] : [],
       persona,
       duration,
       userId,

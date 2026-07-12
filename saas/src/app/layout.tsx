@@ -2,8 +2,10 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider } from "@/components/providers";
+import { ThemeProvider } from "@/components/theme-provider";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { MobileNav } from "@/components/mobile-nav";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/toaster";
 
@@ -50,14 +52,17 @@ export default function RootLayout({
 }) {
   return (
     <ClerkProvider>
-      <html lang="zh-CN">
-        <body className={inter.className}>
-          <ErrorBoundary>
-            <Header />
-            <main>{children}</main>
-            <Footer />
-            <Toaster />
-          </ErrorBoundary>
+      <html lang="zh-CN" className="dark" style={{ colorScheme: "dark" }}>
+        <body className={`${inter.className} dark`}>
+          <ThemeProvider>
+            <ErrorBoundary>
+              <Header />
+              <main className="pb-16 md:pb-0">{children}</main>
+              <MobileNav />
+              <Footer />
+              <Toaster />
+            </ErrorBoundary>
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>
