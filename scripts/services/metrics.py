@@ -1,155 +1,186 @@
-"""
-Prometheus 风格指标收集
-轻量级实现，无需额外依赖
-"""
-
+"""Prometheus 指标导出"""
+from prometheus_client import Counter, Histogram, Gauge, generate_latest
+from fastapi import Response
 import time
-import threading
-from collections import defaultdict
-from typing import Dict, Any
+from functools import wraps
+import logging
+
+logger = logging.getLogger(__name__)
+
+# ─────────────────────────────────────────
+# 指标定义
+# ─────────────────────────────────────────
+
+# 请求计数
+REQUEST_COUNT = Counter(
+    "http_requests_total",
+    "Total HTTP requests",
+    ["method", "endpoint", "status"]
+)
+
+# 请求延迟
+REQUEST_LATENCY = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request latency",
+    ["method", "endpoint"],
+    buckets=[0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+)
+
+# 活跃连接
+ACTIVE_CONNECTIONS = Gauge(
+    "active_connections",
+    "Number of active connections"
+)
+
+# 数据库查询延迟
+DB_QUERY_LATENCY = Histogram(
+    "db_query_duration_seconds",
+    "Database query latency",
+    ["operation", "table"],
+    buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]
+)
+
+# 缓存命中率
+CACHE_HITS = Counter("cache_hits_total", "Total cache hits")
+CACHE_MISSES = Counter("cache_misses_total", "Total cache misses")
+
+# 错误计数
+ERROR_COUNT = Counter(
+    "errors_total",
+    "Total errors",
+    ["type", "endpoint"]
+)
 
 
-class MetricsCollector:
-    """指标收集器 - 线程安全"""
+# ─────────────────────────────────────────
+# 中间件
+# ─────────────────────────────────────────
 
-    def __init__(self):
-        self._lock = threading.Lock()
-        self._counters: Dict[str, int] = defaultdict(int)
-        self._gauges: Dict[str, float] = {}
-        self._histograms: Dict[str, list] = defaultdict(list)
-        self._start_time = time.time()
-
-    # ---- Counter ----
-    def inc(self, name: str, value: int = 1, labels: Dict[str, str] = None):
-        """计数器递增"""
-        key = self._make_key(name, labels)
-        with self._lock:
-            self._counters[key] += value
-
-    # ---- Gauge ----
-    def set(self, name: str, value: float, labels: Dict[str, str] = None):
-        """设置仪表值"""
-        key = self._make_key(name, labels)
-        with self._lock:
-            self._gauges[key] = value
-
-    def gauge_inc(self, name: str, value: float = 1, labels: Dict[str, str] = None):
-        """仪表值递增"""
-        key = self._make_key(name, labels)
-        with self._lock:
-            self._gauges[key] = self._gauges.get(key, 0) + value
-
-    def gauge_dec(self, name: str, value: float = 1, labels: Dict[str, str] = None):
-        """仪表值递减"""
-        key = self._make_key(name, labels)
-        with self._lock:
-            self._gauges[key] = self._gauges.get(key, 0) - value
-
-    # ---- Histogram (简化版) ----
-    def observe(self, name: str, value: float, labels: Dict[str, str] = None):
-        """记录观测值"""
-        key = self._make_key(name, labels)
-        with self._lock:
-            self._histograms[key].append(value)
-            # 只保留最近 1000 个数据点
-            if len(self._histograms[key]) > 1000:
-                self._histograms[key] = self._histograms[key][-1000:]
-
-    # ---- Export ----
-    def export(self) -> Dict[str, Any]:
-        """导出所有指标（JSON格式）"""
-        with self._lock:
-            uptime = time.time() - self._start_time
-
-            # 计算直方图统计
-            hist_stats = {}
-            for key, values in self._histograms.items():
-                if values:
-                    hist_stats[key] = {
-                        "count": len(values),
-                        "sum": sum(values),
-                        "avg": sum(values) / len(values),
-                        "min": min(values),
-                        "max": max(values),
-                    }
-
-            return {
-                "uptime_seconds": round(uptime, 2),
-                "counters": dict(self._counters),
-                "gauges": dict(self._gauges),
-                "histograms": hist_stats,
-            }
-
-    def export_prometheus(self) -> str:
-        """导出 Prometheus 文本格式"""
-        data = self.export()
-        lines = []
-
-        lines.append(f"# HELP uptime_seconds Service uptime in seconds")
-        lines.append(f"# TYPE uptime_seconds gauge")
-        lines.append(f"uptime_seconds {data['uptime_seconds']}")
-
-        for key, value in data["counters"].items():
-            lines.append(f"# HELP {key} Counter metric")
-            lines.append(f"# TYPE {key} counter")
-            lines.append(f"{key} {value}")
-
-        for key, value in data["gauges"].items():
-            lines.append(f"# HELP {key} Gauge metric")
-            lines.append(f"# TYPE {key} gauge")
-            lines.append(f"{key} {value}")
-
-        return "\n".join(lines)
-
-    @staticmethod
-    def _make_key(name: str, labels: Dict[str, str] = None) -> str:
-        """生成带标签的指标名"""
-        if not labels:
-            return name
-        label_str = ",".join(f'{k}="{v}"' for k, v in sorted(labels.items()))
-        return f'{name}{{{label_str}}}'
+def metrics_middleware(request, call_next):
+    """指标收集中间件"""
+    start_time = time.time()
+    
+    # 增加活跃连接
+    ACTIVE_CONNECTIONS.inc()
+    
+    try:
+        response = call_next(request)
+        
+        # 记录请求
+        REQUEST_COUNT.labels(
+            method=request.method,
+            endpoint=request.url.path,
+            status=response.status_code
+        ).inc()
+        
+        # 记录延迟
+        latency = time.time() - start_time
+        REQUEST_LATENCY.labels(
+            method=request.method,
+            endpoint=request.url.path
+        ).observe(latency)
+        
+        return response
+    
+    except Exception as e:
+        # 记录错误
+        ERROR_COUNT.labels(
+            type=type(e).__name__,
+            endpoint=request.url.path
+        ).inc()
+        raise
+    
+    finally:
+        ACTIVE_CONNECTIONS.dec()
 
 
-# 全局单例
-metrics = MetricsCollector()
+# ─────────────────────────────────────────
+# 装饰器
+# ─────────────────────────────────────────
 
-
-# 便捷装饰器：统计接口耗时
-def timed(metric_name: str = "http_request_duration_seconds"):
-    """请求耗时统计装饰器"""
+def track_db_query(operation: str, table: str):
+    """数据库查询追踪装饰器"""
     def decorator(func):
-        import functools
-
-        @functools.wraps(func)
-        async def async_wrapper(*args, **kwargs):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
             start = time.time()
             try:
                 result = await func(*args, **kwargs)
-                metrics.inc("http_requests_total", labels={"status": "success"})
                 return result
-            except Exception:
-                metrics.inc("http_requests_total", labels={"status": "error"})
-                raise
             finally:
-                duration = time.time() - start
-                metrics.observe(metric_name, duration)
-
-        @functools.wraps(func)
-        def sync_wrapper(*args, **kwargs):
-            start = time.time()
-            try:
-                result = func(*args, **kwargs)
-                metrics.inc("http_requests_total", labels={"status": "success"})
-                return result
-            except Exception:
-                metrics.inc("http_requests_total", labels={"status": "error"})
-                raise
-            finally:
-                duration = time.time() - start
-                metrics.observe(metric_name, duration)
-
-        import asyncio
-        if asyncio.iscoroutinefunction(func):
-            return async_wrapper
-        return sync_wrapper
+                latency = time.time() - start
+                DB_QUERY_LATENCY.labels(
+                    operation=operation,
+                    table=table
+                ).observe(latency)
+        return wrapper
     return decorator
+
+
+def track_cache_hit():
+    """缓存命中追踪"""
+    CACHE_HITS.inc()
+
+
+def track_cache_miss():
+    """缓存未命中追踪"""
+    CACHE_MISSES.inc()
+
+
+# ─────────────────────────────────────────
+# 端点
+# ─────────────────────────────────────────
+
+async def metrics_endpoint():
+    """Prometheus 指标端点"""
+    return Response(
+        content=generate_latest(),
+        media_type="text/plain; version=0.0.4; charset=utf-8"
+    )
+
+
+# ─────────────────────────────────────────
+# 业务指标
+# ─────────────────────────────────────────
+
+# 内容统计
+CONTENT_TOTAL = Gauge("content_total", "Total content count", ["status"])
+CONTENT_PUBLISHED = Counter("content_published_total", "Total published content")
+CONTENT_VIEWS = Counter("content_views_total", "Total content views", ["content_id"])
+
+# 用户统计
+USER_TOTAL = Gauge("user_total", "Total users")
+USER_ACTIVE = Gauge("user_active_total", "Active users in last 24h")
+USER_SIGNUPS = Counter("user_signups_total", "Total user signups")
+
+# 订阅统计
+SUBSCRIPTION_TOTAL = Gauge("subscription_total", "Total subscriptions", ["plan"])
+SUBSCRIPTION_REVENUE = Counter(
+    "subscription_revenue_total",
+    "Total subscription revenue",
+    ["plan"],
+    unit="cents"
+)
+
+# 热点统计
+TRENDS_SCANNED = Counter("trends_scanned_total", "Total trends scanned")
+TRENDS_MATCHED = Counter("trends_matched_total", "Total trends matched with content")
+
+
+def record_content_published():
+    CONTENT_PUBLISHED.inc()
+
+def record_content_view(content_id: str):
+    CONTENT_VIEWS.labels(content_id=content_id).inc()
+
+def record_user_signup():
+    USER_SIGNUPS.inc()
+
+def record_subscription_revenue(plan: str, amount_cents: int):
+    SUBSCRIPTION_REVENUE.labels(plan=plan).inc(amount_cents)
+
+def record_trends_scanned(count: int):
+    TRENDS_SCANNED.inc(count)
+
+def record_trends_matched(count: int):
+    TRENDS_MATCHED.inc(count)

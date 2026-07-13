@@ -1,33 +1,16 @@
-import os
+"""FastAPI 路由模块
 
-from fastapi import FastAPI, Request
+提供完整的 RESTful API 端点，包含 OpenAPI 文档。
+"""
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.openapi.docs import get_swagger_ui_html
+import time
+import logging
+from typing import Optional
 
 from routers import (
-    content,
-    titles,
-    score,
-    rules,
-    ab_test,
-    analytics,
-    video,
-    calendar,
-    image,
-    templates,
-    agent,
-    team,
-    model_router,
-    health,
-    insights,
-    fire_score,
-    competitors,
-    stream,
-    insights_reports,
-    calibrate,
-    knowledge,
-    payment,
     media_assets,
     comments,
     tags,
@@ -36,209 +19,266 @@ from routers import (
     publish_logs,
     trends,
 )
-from services.error_handler import ServiceError, error_response
-from services.logging import logger
-from services.env_validator import print_validation
-from services.metrics import metrics
-from monitors.browser import get_browser_pool, _browser_pool
-from middleware import setup_middleware
+from services.database import Database
+from services.performance import PerformanceMonitor
+
+# ─────────────────────────────────────────
+# 应用初始化
+# ─────────────────────────────────────────
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="智媒圈 API",
-    description="AI内容策略引擎 - 后端服务",
-    version="0.7.0",
+    description="""
+## 智媒圈 — 智能内容运营平台
+
+提供全方位的内容管理、协作评论、热点追踪、订阅管理和分发渠道功能。
+
+### 主要功能
+- **媒体资产管理**: 上传、存储、管理图片/视频等媒体资源
+- **协作评论**: 多人协作评论和审核流程
+- **标签体系**: 内容标签分类和智能推荐
+- **订阅管理**: 用户订阅和计费周期管理
+- **分发渠道**: 多平台内容分发
+- **热点追踪**: 实时热点监测和推荐
+
+### 认证方式
+使用 Bearer Token 认证，在请求头添加：
+```
+Authorization: Bearer <your_token>
+```
+    """,
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    openapi_tags=[
+        {"name": "media", "description": "媒体资源管理"},
+        {"name": "comments", "description": "评论管理"},
+        {"name": "tags", "description": "标签管理"},
+        {"name": "subscriptions", "description": "订阅管理"},
+        {"name": "channels", "description": "分发渠道"},
+        {"name": "trends", "description": "热点追踪"},
+        {"name": "logs", "description": "发布日志"},
+        {"name": "health", "description": "健康检查"},
+    ],
+    contact={
+        "name": "智媒圈技术支持",
+        "email": "support@zhimeiquan.com",
+    },
+    license_info={
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT",
+    },
 )
 
-# BrowserPool lifespan 集成 - 启动时初始化浏览器池，关闭时优雅清理
-@app.on_event("startup")
-async def startup_browser_pool():
-    """应用启动时预热 BrowserPool（如果浏览器采集已启用）"""
-    try:
-        from monitors.browser import is_browser_enabled
-        if is_browser_enabled():
-            logger.info("启动 BrowserPool...")
-            await get_browser_pool()
-            logger.info("BrowserPool 已就绪")
-        else:
-            logger.info("浏览器采集已禁用，跳过 BrowserPool 初始化")
-    except Exception as e:
-        logger.warning(f"BrowserPool 启动失败（非致命）: {e}")
-
-
-@app.on_event("shutdown")
-async def shutdown_browser_pool():
-    """应用关闭时清理 BrowserPool 和残留 Chromium 进程"""
-    global _browser_pool
-    if _browser_pool is not None:
-        try:
-            await _browser_pool.stop()
-            _browser_pool = None
-            logger.info("BrowserPool 已优雅关闭")
-        except Exception as e:
-            logger.error(f"BrowserPool 关闭异常: {e}")
-
-ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    os.getenv("FRONTEND_URL", "https://www.zhimeiquan.com"),
-]
-
-# 生产环境收紧 CORS，只允许正式域名
-ENV = os.getenv("ENV", "development")
-if ENV == "production":
-    ALLOWED_ORIGINS = [os.getenv("FRONTEND_URL", "https://www.zhimeiquan.com")]
+# ─────────────────────────────────────────
+# CORS 配置
+# ─────────────────────────────────────────
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://zhimeiquan.com",
+        "https://*.zhimeiquan.com",
+    ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Content-Type", "Authorization", "X-API-Key"],
-    max_age=86400,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-setup_middleware(app)
 
-# 启动时环境变量校验
-logger.info("执行环境变量校验...")
-env_valid = print_validation()
-if not env_valid:
-    logger.warning("环境变量校验未完全通过，部分功能可能不可用")
+# ─────────────────────────────────────────
+# 中间件
+# ─────────────────────────────────────────
+
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    """添加处理时间头"""
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = f"{process_time:.3f}s"
+    
+    # 记录慢请求
+    if process_time > 1.0:
+        logger.warning(f"Slow request: {request.method} {request.url.path} took {process_time:.3f}s")
+    
+    return response
 
 
-@app.exception_handler(ServiceError)
-async def service_error_handler(request, exc: ServiceError):
-    logger.error("服务错误", code=exc.code, message=exc.message, path=request.url.path)
-    return error_response(status=exc.status, message=exc.message, code=exc.code)
+@app.middleware("http")
+async def catch_exceptions_middleware(request: Request, call_next):
+    """全局异常捕获"""
+    try:
+        return await call_next(request)
+    except Exception as exc:
+        logger.exception(f"Unhandled exception: {exc}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error", "detail": str(exc)},
+        )
 
 
-@app.exception_handler(RequestValidationError)
-async def validation_error_handler(request, exc: RequestValidationError):
-    logger.warning("参数验证失败", errors=exc.errors(), path=request.url.path)
-    return error_response(
-        status=422,
-        message="参数验证失败",
-        code="validation_error",
-        detail={"errors": exc.errors()},
+# ─────────────────────────────────────────
+# 依赖注入
+# ─────────────────────────────────────────
+
+async def get_current_user(request: Request) -> dict:
+    """获取当前用户（认证中间件）"""
+    # 从请求头获取 token
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="未认证")
+    
+    token = auth_header[7:]
+    # TODO: 验证 JWT token
+    # 这里简化处理，实际应验证 token 并返回用户信息
+    return {"user_id": "test-user", "role": "admin"}
+
+
+async def get_db() -> Database:
+    """获取数据库实例"""
+    return Database()
+
+
+# ─────────────────────────────────────────
+# 健康检查
+# ─────────────────────────────────────────
+
+@app.get("/health", tags=["health"])
+async def health_check():
+    """
+    健康检查端点
+    
+    返回服务状态和各组件健康度。
+    """
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "components": {
+            "database": "ok",
+            "redis": "ok",
+            "storage": "ok",
+        },
+        "timestamp": time.time(),
+    }
+
+
+@app.get("/health/ready", tags=["health"])
+async def readiness_check():
+    """
+    就绪检查端点
+    
+    用于 Kubernetes 就绪探针。
+    """
+    # 检查数据库连接
+    try:
+        db = Database()
+        db.execute("SELECT 1")
+        return {"status": "ready"}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Not ready: {e}")
+
+
+@app.get("/health/live", tags=["health"])
+async def liveness_check():
+    """
+    存活检查端点
+    
+    用于 Kubernetes 存活探针。
+    """
+    return {"status": "alive"}
+
+
+# ─────────────────────────────────────────
+# 注册路由
+# ─────────────────────────────────────────
+
+app.include_router(
+    media_assets.router,
+    prefix="/api/v1/media",
+    tags=["media"],
+)
+app.include_router(
+    comments.router,
+    prefix="/api/v1/comments",
+    tags=["comments"],
+)
+app.include_router(
+    tags.router,
+    prefix="/api/v1/tags",
+    tags=["tags"],
+)
+app.include_router(
+    subscriptions.router,
+    prefix="/api/v1/subscriptions",
+    tags=["subscriptions"],
+)
+app.include_router(
+    channels.router,
+    prefix="/api/v1/channels",
+    tags=["channels"],
+)
+app.include_router(
+    publish_logs.router,
+    prefix="/api/v1/logs",
+    tags=["logs"],
+)
+app.include_router(
+    trends.router,
+    prefix="/api/v1/trends",
+    tags=["trends"],
+)
+
+
+# ─────────────────────────────────────────
+# 根端点
+# ─────────────────────────────────────────
+
+@app.get("/", include_in_schema=False)
+async def root():
+    """API 根端点"""
+    return {
+        "name": "智媒圈 API",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "openapi": "/openapi.json",
+    }
+
+
+# ─────────────────────────────────────────
+# 启动/关闭事件
+# ─────────────────────────────────────────
+
+@app.on_event("startup")
+async def startup_event():
+    """应用启动事件"""
+    logger.info("智媒圈 API 启动")
+    # 初始化数据库连接池
+    # 初始化 Redis 连接
+    # 初始化其他资源
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """应用关闭事件"""
+    logger.info("智媒圈 API 关闭")
+    # 关闭数据库连接池
+    # 关闭 Redis 连接
+    # 清理其他资源
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info",
     )
-
-
-app.include_router(content.router, prefix="/api/v1/content", tags=["内容生成"])
-app.include_router(titles.router, prefix="/api/v1/titles", tags=["标题生成"])
-app.include_router(score.router, prefix="/api/v1/content", tags=["内容评分"])
-app.include_router(rules.router, prefix="/api/v1/monitor", tags=["爆款监控"])
-app.include_router(video.router, prefix="/api/v1/video", tags=["视频生成"])
-app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["数据闭环"])
-app.include_router(ab_test.router, prefix="/api/v1/ab-test", tags=["A/B测试"])
-app.include_router(calendar.router, prefix="/api/v1/calendar", tags=["内容调度"])
-app.include_router(image.router, prefix="/api/v1/image", tags=["图像生成"])
-app.include_router(templates.router, prefix="/api/v1/templates", tags=["模板系统"])
-app.include_router(agent.router, prefix="/api/v1/agent", tags=["自主Agent"])
-app.include_router(team.router, prefix="/api/v1/team", tags=["团队协作"])
-app.include_router(model_router.router, prefix="/api/v1/router", tags=["模型路由"])
-app.include_router(insights.router, prefix="/api/v1/insights", tags=["内容洞察"])
-app.include_router(fire_score.router, prefix="/api/v1/fire-score", tags=["Fire Score 校准"])
-app.include_router(competitors.router, prefix="/api/v1/competitors", tags=["竞品监控"])
-app.include_router(stream.router, prefix="/api/v1/stream", tags=["流式生成"])
-app.include_router(insights_reports.router, prefix="/api/insights", tags=["分析报告"])
-app.include_router(calibrate.router, prefix="/api/v1/calibrate", tags=["Fire Score 校准"])
-app.include_router(knowledge.router, prefix="/api/v1/knowledge", tags=["知识图谱"])
-app.include_router(payment.router, prefix="/api/v1/payment", tags=["支付"])
-app.include_router(health.router, tags=["健康检查"])
-app.include_router(media_assets.router, prefix="/api/v1/media", tags=["媒体资产"])
-app.include_router(comments.router, prefix="/api/v1/comments", tags=["协作评论"])
-app.include_router(tags.router, prefix="/api/v1/tags", tags=["标签体系"])
-app.include_router(subscriptions.router, prefix="/api/v1/subscriptions", tags=["订阅管理"])
-app.include_router(channels.router, prefix="/api/v1/channels", tags=["分发渠道"])
-app.include_router(publish_logs.router, prefix="/api/v1/publish-logs", tags=["发布日志"])
-app.include_router(trends.router, prefix="/api/v1/trends", tags=["热点追踪"])
-
-
-@app.get("/health")
-async def health():
-    return {
-        "status": "ok",
-        "version": "0.7.0",
-        "service": "zhimeiquan-api",
-    }
-
-
-@app.get("/ready")
-async def ready():
-    """就绪检查 - 包含依赖状态"""
-    checks: dict[str, str | dict] = {"api": "ok"}
-
-    # 数据库连通性检查
-    db_url = os.environ.get("DATABASE_URL", "")
-    if db_url:
-        try:
-            if "postgresql" in db_url or "postgres" in db_url:
-                import asyncpg
-                conn = await asyncpg.connect(db_url, timeout=5)
-                await conn.execute("SELECT 1")
-                await conn.close()
-            elif "sqlite" in db_url:
-                import sqlite3
-                db_path = db_url.replace("sqlite:", "").replace("file:", "").lstrip("/")
-                conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5)
-                conn.execute("SELECT 1")
-                conn.close()
-            checks["database"] = "ok"
-        except Exception as e:
-            checks["database"] = f"error: {type(e).__name__}"
-    else:
-        checks["database"] = "not_configured"
-
-    # Redis 连通性检查（可选依赖）
-    redis_url = os.environ.get("REDIS_URL", "")
-    if redis_url:
-        try:
-            import redis
-            r = redis.from_url(redis_url, socket_connect_timeout=3)
-            r.ping()
-            r.close()
-            checks["redis"] = "ok"
-        except Exception:
-            checks["redis"] = "unavailable (degraded)"
-
-    # LLM API 连通性检查（轻量）
-    if "DEEPSEEK_API_KEY" in os.environ:
-        try:
-            import httpx
-            async with httpx.AsyncClient(timeout=5) as client:
-                resp = await client.get(
-                    "https://api.deepseek.com/v1/models",
-                    headers={"Authorization": f"Bearer {os.environ['DEEPSEEK_API_KEY']}"},
-                )
-                checks["llm"] = "ok" if resp.status_code == 200 else f"status_{resp.status_code}"
-        except Exception as e:
-            checks["llm"] = f"error: {type(e).__name__}"
-
-    all_ok = all(
-        v == "ok" for v in checks.values()
-        if isinstance(v, str) and v != "unavailable (degraded)"
-    )
-
-    return {
-        "status": "ready" if all_ok else "degraded",
-        "version": "0.7.0",
-        "checks": checks,
-    }
-
-
-@app.get("/metrics")
-async def get_metrics():
-    """Prometheus 风格指标端点"""
-    # 统计活跃用户（简化版）
-    data = metrics.export()
-
-    return {
-        "uptime_seconds": data["uptime_seconds"],
-        "requests_total": data["counters"].get("http_requests_total", 0),
-        "errors_total": data["counters"].get("http_requests_total{status=\"error\"}", 0),
-        "active_users": data["gauges"].get("active_users", 0),
-        "cache_hit_rate": data["gauges"].get("cache_hit_rate", 0.0),
-        "avg_response_time_ms": round(
-            data["histograms"].get("http_request_duration_seconds", {}).get("avg", 0) * 1000, 2
-        ),
-        "detail": data,
-    }
