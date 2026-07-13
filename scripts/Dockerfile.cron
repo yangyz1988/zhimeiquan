@@ -1,0 +1,33 @@
+# ========================================
+# 智媒圈定时任务 Dockerfile
+# ========================================
+
+ARG PYTHON_VERSION=3.11
+FROM python:${PYTHON_VERSION}-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# 安装依赖
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制代码
+COPY . .
+
+# 创建数据目录
+RUN mkdir -p /app/data
+
+# 安装 cron
+RUN apt-get update && apt-get install -y --no-install-recommends cron && \
+    rm -rf /var/lib/apt/lists/*
+
+# 复制 crontab
+COPY deploy/cron/crontab /etc/cron.d/zhimeiquan
+RUN chmod 0644 /etc/cron.d/zhimeiquan && \
+    crontab /etc/cron.d/zhimeiquan
+
+# 启动 cron
+CMD ["cron", "-f"]

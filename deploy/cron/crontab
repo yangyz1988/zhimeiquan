@@ -1,0 +1,21 @@
+# ========================================
+# 智媒圈定时任务配置
+# ========================================
+
+# 环境变量
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+
+# 每小时扫描热点
+0 * * * * cd /app && python -m scripts.scanners.trend_scanner >> /var/log/zhimeiquan/trends.log 2>&1
+
+# 每天凌晨3点清理过期数据
+0 3 * * * cd /app && python -m scripts.tasks.cleanup >> /var/log/zhimeiquan/cleanup.log 2>&1
+
+# 每小时同步渠道数据
+5 * * * * cd /app && python -m scripts.sync.channel_sync >> /var/log/zhimeiquan/sync.log 2>&1
+
+# 每6小时生成分析报告
+0 */6 * * * cd /app && python -m scripts.reports.daily_summary >> /var/log/zhimeiquan/reports.log 2>&1
+
+# 空行结束

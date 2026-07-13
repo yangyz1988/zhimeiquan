@@ -1,0 +1,16 @@
+# ========================================
+# Prisma 生产配置
+# ========================================
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+# PostgreSQL 连接池配置（生产环境）
+# 建议在 DATABASE_URL 中添加 ?pg_max_conns=20

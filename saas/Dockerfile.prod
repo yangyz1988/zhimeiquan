@@ -1,0 +1,65 @@
+# ========================================
+# 智媒圈前端生产 Dockerfile
+# ========================================
+
+ARG NODE_VERSION=20
+FROM node:${NODE_VERSION}-alpine as base
+
+# 环境变量
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1
+
+WORKDIR /app
+
+# ─────────────────────────────────────────
+# Dependencies stage
+# ─────────────────────────────────────────
+FROM base as deps
+
+# 安装 pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# 复制依赖文件
+COPY package.json pnpm-lock.yaml ./
+COPY prisma ./prisma/
+
+# 安装依赖
+RUN pnpm install --frozen-lockfile --prod=false
+
+# ─────────────────────────────────────────
+# Builder stage
+# ─────────────────────────────────────────
+FROM deps as builder
+
+COPY . .
+
+# 生成 Prisma Client
+RUN pnpm prisma generate
+
+# 构建
+ENV NEXT_BUILD_ENV=production
+RUN pnpm run build
+
+# ─────────────────────────────────────────
+# Production stage
+# ─────────────────────────────────────────
+FROM base as production
+
+# 安装 pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# 复制构建产物
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/prisma ./prisma
+
+# 创建数据目录
+RUN mkdir -p /app/data
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD wget --spider -q http://localhost:3000/api/health || exit 1
+
+# 启动
+CMD ["node", "server.js"]
